@@ -6,6 +6,9 @@ data/*.db
 data/*.db-shm
 data/*.db-wal
 data/*.log
+data/logs/
+data/backups/
+data/sync.lock
 
 # Python
 __pycache__/

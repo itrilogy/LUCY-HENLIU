@@ -233,14 +233,8 @@ def sync_predictions(db, prog) -> int:
     return r["predicted"]
 
 
-def main():
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--quick", action="store_true", help="快速模式(仅行情+K线+分时)")
-    parser.add_argument("--full", action="store_true", help="全量模式")
-    args = parser.parse_args()
-    
-    quick = args.quick
+def _run(quick: bool) -> int:
+    """实际同步流程（由 main 在单实例锁内调用）"""
     mode = "🔄 一键全量同步" if not quick else "⚡ 快速同步(行情+K线+分时)"
     
     db_path = str(Path(__file__).parent.parent / "data" / "stock.db")
@@ -274,6 +268,33 @@ def main():
                ("daily_sync", r['steps'], int(r['duration']*1000)))
     db.commit()
     db.close()
+    return int(r['duration'] * 1000)
+
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--quick", action="store_true", help="快速模式(仅行情+K线+分时)")
+    parser.add_argument("--full", action="store_true", help="全量模式")
+    args = parser.parse_args()
+
+    # 统一日志：src.* 模块的日志进入 data/logs/src.log（按天轮转）
+    from src.service.logging_setup import setup_logging
+    setup_logging("src")
+
+    # 单实例锁：防止定时任务与手动执行并发写库
+    from src.service.lock import single_instance
+    with single_instance("数据同步"):
+        _run(quick=args.quick)
+
+    # 同步完成后自动备份
+    try:
+        from src.service.backup import backup_db
+        b = backup_db()
+        print(f"💾 数据备份: {b}")
+    except Exception as e:
+        print(f"⚠️ 备份失败: {e}", file=__import__('sys').stderr)
+
 
 if __name__ == "__main__":
     main()
