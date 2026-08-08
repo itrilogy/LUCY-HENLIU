@@ -51,8 +51,9 @@ streamlit run src/main.py
 
 ```
 src/
-├── main.py                    # Streamlit UI
-├── sync_daily.py              # 一键全量同步（行情+K线+分时+财务+研报+预测闭环）
+├── main.py                    # Streamlit UI（含自选股管理/覆盖率展示/回测绩效）
+├── scheduler.py               # 交易日 15:30 定时调度 + 结果告警（常驻）
+├── sync_daily.py              # 一键全量同步（单实例锁 + 完成后自动备份）
 ├── sync_now.py                # 全量同步脚本（行情+K线）
 ├── sync_trend.py              # 分时同步脚本
 ├── sync_financial.py          # 财务同步脚本
@@ -61,18 +62,41 @@ src/
 ├── sync_research_history.py   # 历史研报回填
 ├── datasource/
 │   ├── sdicsc_client.py       # 国投证券 API
-│   └── gs_client.py           # 国信证券 API
+│   ├── gs_client.py           # 国信证券 API
+│   └── ratelimit.py           # 限流/重试/熔断统一封装（429 重试 + 日限额熔断）
 ├── quant/
 │   ├── engine.py              # 量化分析引擎（GMM/马尔可夫/动量）
-│   ├── pattern_discovery.py   # 模式发现引擎 (v2.0)
+│   ├── pattern_discovery.py   # 模式发现引擎（显著性二项检验 + 增强回测）
 │   └── prediction_loop.py     # 预测-反馈闭环（结算+新预测）
 ├── analyst/
 │   └── research.py            # AI 研报引擎（宏观问答+标签分类）
 ├── db/
 │   └── schema.py              # 数据库统一 DDL（24 张表）
 └── service/
-    └── sync.py                # 同步调度服务（K线补全/间隙修复/财务补拉）
+    ├── sync.py                # 同步调度服务（K线补全/间隙修复/财务补拉）
+    ├── logging_setup.py       # 统一日志（data/logs/，按天轮转）
+    ├── lock.py                # 跨进程单实例锁（fcntl）
+    ├── backup.py              # SQLite 自动备份（VACUUM INTO 每日快照）
+    ├── notify.py              # 多通道通知（日志 + 微信机器人）
+    └── coverage.py            # 数据覆盖率计算（data_coverage）
+
+tests/                         # pytest 单元测试（36 个用例）
 ```
+
+## 工程能力
+
+| 能力 | 说明 |
+|---|---|
+| 单元测试 | `python3 -m pytest tests/ -q`（需先 `pip install pytest`） |
+| API 限流/熔断 | 国投 429 自动指数退避重试；国信日限额（197006）当日熔断不再发请求 |
+| 单实例锁 | 同步脚本并发执行时自动跳过，防止写坏 SQLite |
+| 自动备份 | 每次同步后 `VACUUM INTO` 快照到 `data/backups/`（保留 14 天） |
+| 定时任务 | `python3 src/scheduler.py` 常驻：工作日 15:30 自动全量同步 |
+| 告警 | 同步完成/异常推送微信（WEIXIN_BOT_TOKEN）并写 `data/logs/` |
+| 自选股管理 | UI 操作 Tab 增删自选股（数据库驱动，不再硬编码） |
+| 数据覆盖率 | UI 展示每只股票 K线/分时/财务覆盖，落库 `data_coverage` |
+| 回测绩效 | 成本模型（默认双边 0.1%）、最大回撤、夏普、分模式胜率 |
+| 模式显著性 | 二项检验（α=0.05，样本≥10），不显著模式投票权重减半 |
 
 ## 收敛预测闭环
 
