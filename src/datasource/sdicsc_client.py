@@ -13,6 +13,11 @@ from datetime import datetime
 
 import httpx
 
+try:
+    from src.datasource.ratelimit import api_call, APIError, RetryableError
+except ImportError:
+    from ratelimit import api_call, APIError, RetryableError
+
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://skills.sdicsc.com.cn/skill/hq"
@@ -47,6 +52,23 @@ def _normalize_code(code: str) -> str:
 
 # ── 行情 API ────────────────────────────────────
 
+def _request_json(method: str, url: str, **kwargs) -> dict:
+    """带指数退避重试的 JSON 请求（国投 429 瞬时限流自动重试）"""
+    def do_request() -> dict:
+        try:
+            resp = httpx.request(method, url, **kwargs)
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            code = e.response.status_code
+            if code in (429, 502, 503, 504):
+                raise RetryableError(f"HTTP {code} {url}")
+            raise APIError(f"HTTP {code} {url}")
+        except httpx.TimeoutException as e:
+            raise RetryableError(f"超时 {url} → {e}")
+        return resp.json()
+    return api_call(do_request, breaker_key="sdicsc")
+
+
 def get_quote(code: str) -> dict:
     """
     获取单只股票实时行情
@@ -54,9 +76,7 @@ def get_quote(code: str) -> dict:
     """
     code = _normalize_code(code)
     url = f"{BASE_URL}/api/quote/{code}"
-    resp = httpx.get(url, headers=_headers(), timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
+    data = _request_json("GET", url, headers=_headers(), timeout=10)
     return data.get("data") or data
 
 
@@ -67,10 +87,8 @@ def get_batch_quote(codes: List[str]) -> List[dict]:
     """
     normalized = [_normalize_code(c) for c in codes]
     url = f"{BASE_URL}/api/quote/batch"
-    resp = httpx.post(url, headers=_headers(), json={"codes": normalized},
-                      timeout=15)
-    resp.raise_for_status()
-    data = resp.json()
+    data = _request_json("POST", url, headers=_headers(),
+                         json={"codes": normalized}, timeout=15)
     return data.get("data", [])
 
 
@@ -84,10 +102,8 @@ def get_kline(code: str, ktype: str = "day", count: int = 120) -> List[dict]:
     """
     code = _normalize_code(code)
     url = f"{BASE_URL}/api/kline/{code}"
-    resp = httpx.get(url, headers=_headers(),
-                     params={"type": ktype, "count": count}, timeout=15)
-    resp.raise_for_status()
-    data = resp.json()
+    data = _request_json("GET", url, headers=_headers(),
+                         params={"type": ktype, "count": count}, timeout=15)
     return data.get("kLineData", data.get("data", []))
 
 
@@ -97,9 +113,7 @@ def get_trend(code: str) -> dict:
     """获取分时数据 GET /api/trend/:code"""
     code = _normalize_code(code)
     url = f"{BASE_URL}/api/trend/{code}"
-    resp = httpx.get(url, headers=_headers(), timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
+    data = _request_json("GET", url, headers=_headers(), timeout=10)
     return data.get("data", {})
 
 
@@ -115,9 +129,7 @@ def get_rank(sort: str = "changePercent", order: str = "desc",
     if market:
         params["market"] = market
     url = f"{BASE_URL}/api/rank/stock"
-    resp = httpx.get(url, headers=_headers(), params=params, timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
+    data = _request_json("GET", url, headers=_headers(), params=params, timeout=10)
     return data.get("data", [])
 
 

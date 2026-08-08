@@ -12,6 +12,15 @@ from urllib.parse import urlencode
 import urllib.request
 import ssl
 
+try:
+    from src.datasource.ratelimit import (
+        api_call, APIError, RetryableError, QuotaExceededError, GS_QUOTA_CODE,
+    )
+except ImportError:  # 直接以脚本方式运行 src/datasource/gs_client.py 时
+    from ratelimit import (
+        api_call, APIError, RetryableError, QuotaExceededError, GS_QUOTA_CODE,
+    )
+
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://dgzt.guosen.com.cn/skills"
@@ -34,15 +43,34 @@ def _api_key() -> str:
 
 
 def _get(url: str, params: dict) -> dict:
-    """GET 请求工具"""
+    """GET 请求工具（指数退避重试 + 日限额熔断）"""
     params["apiKey"] = _api_key()
     params["softName"] = SOFT_NAME
     full = f"{url}?{urlencode(params)}"
+
+    def do_request() -> dict:
+        try:
+            with urllib.request.urlopen(full, context=SSL_CTX, timeout=15) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 502, 503, 504):
+                raise RetryableError(f"HTTP {e.code} {url}")
+            raise APIError(f"HTTP {e.code} {url}")
+        except (TimeoutError, urllib.error.URLError) as e:
+            raise RetryableError(f"网络错误 {url} → {e}")
+        # 识别日限额：result[0].code == 197006（当日无法恢复，触发熔断）
+        result = data.get("result") if isinstance(data, dict) else None
+        if isinstance(result, list) and result and result[0].get("code") == GS_QUOTA_CODE:
+            raise QuotaExceededError(f"GS_API_KEY 日限额耗尽: {result[0].get('msg')}")
+        return data
+
     try:
-        with urllib.request.urlopen(full, context=SSL_CTX, timeout=15) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except Exception as e:
-        logger.error(f"GS API 请求失败: {url} → {e}")
+        return api_call(do_request, breaker_key="gs")
+    except QuotaExceededError as e:
+        logger.error("GS API 限额/熔断: %s", e)
+        return {"result": [{"code": GS_QUOTA_CODE, "msg": str(e)}], "data": None}
+    except APIError as e:
+        logger.error("GS API 请求失败: %s → %s", url, e)
         return {"result": [{"code": -1, "msg": str(e)}], "data": None}
 
 
