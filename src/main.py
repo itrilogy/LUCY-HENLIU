@@ -90,12 +90,16 @@ def toggle_holding(db, code):
     st.cache_data.clear()
 
 def guess_market(code: str) -> str:
-    """按代码前缀推断市场（6/5/11/12→SH，0/1/3→SZ，4/8→BJ，H→HK）"""
+    """按代码前缀推断市场（H→HK，6/5→SH，4/8→BJ，其余→SZ）"""
     c = code.strip().upper()
     if c.startswith("H"): return "HK"
-    if c[0] in "56" or c.startswith(("11", "12")):  # 11/12 沪市可转债/可交换债
-        return "SH"
+    if c[0] in "56": return "SH"
     if c[0] in "48": return "BJ"
+    # 可转债/可交换债按具体代码段细分
+    # 沪市：110/113/118/132（可转债）、120/122/124（可交换债）
+    if c.startswith(("110", "113", "118", "132", "120", "122", "124")):
+        return "SH"
+    # 深市：123/125/127/128/129（可转债）等 → 默认 SZ
     return "SZ"
 
 def add_stock(db, code: str) -> str:
