@@ -53,7 +53,8 @@ def _normalize_code(code: str) -> str:
 # ── 行情 API ────────────────────────────────────
 
 def _request_json(method: str, url: str, **kwargs) -> dict:
-    """带指数退避重试的 JSON 请求（国投 429 瞬时限流自动重试）"""
+    """带指数退避重试的 JSON 请求（国投 429 瞬时限流自动重试）。
+    注：国投无日配额错误码，breaker 不会被触发——本函数只重试不熔断。"""
     def do_request() -> dict:
         try:
             resp = httpx.request(method, url, **kwargs)

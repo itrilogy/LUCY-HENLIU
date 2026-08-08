@@ -90,10 +90,11 @@ def toggle_holding(db, code):
     st.cache_data.clear()
 
 def guess_market(code: str) -> str:
-    """按代码前缀推断市场（6/5→SH，0/1/3→SZ，4/8→BJ，H→HK）"""
+    """按代码前缀推断市场（6/5/11/12→SH，0/1/3→SZ，4/8→BJ，H→HK）"""
     c = code.strip().upper()
     if c.startswith("H"): return "HK"
-    if c[0] in "56": return "SH"
+    if c[0] in "56" or c.startswith(("11", "12")):  # 11/12 沪市可转债/可交换债
+        return "SH"
     if c[0] in "48": return "BJ"
     return "SZ"
 
@@ -627,7 +628,7 @@ def main():
         st.divider()
         with st.expander("📊 数据覆盖率"):
             from src.service.coverage import compute_coverage
-            cov = compute_coverage(db)
+            cov = compute_coverage(db, persist=False)  # UI 只读展示，不落库
             if cov:
                 st.dataframe(pd.DataFrame(cov), use_container_width=True, hide_index=True)
             else:

@@ -6,10 +6,12 @@ import sqlite3
 from typing import List
 
 
-def compute_coverage(db: sqlite3.Connection) -> List[dict]:
+def compute_coverage(db: sqlite3.Connection, persist: bool = True) -> List[dict]:
     """
-    计算并落库每只自选股的覆盖率，返回可展示的报告行。
-    data_coverage 表结构见 src/db/schema.py（UNIQUE(stock_code, data_type)）。
+    计算并（可选）落库每只自选股的覆盖率，返回可展示的报告行。
+
+    :param persist: 是否写入 data_coverage 表。UI 浏览时应传 False，
+        避免把 last_synced_at 刷成当前时间污染"最后同步"口径。
     """
     stocks = db.execute("SELECT stock_code FROM portfolio_stock").fetchall()
     rows: List[dict] = []
@@ -27,27 +29,28 @@ def compute_coverage(db: sqlite3.Connection) -> List[dict]:
             "SELECT COUNT(*) FROM financial_statement WHERE stock_code=?", (code,)).fetchone()
 
         k_start, k_end, k_days = k
-        if k_days:
-            db.execute(
-                """INSERT OR REPLACE INTO data_coverage
-                   (stock_code, data_type, coverage_start, coverage_end,
-                    total_days, filled_days, last_synced_at)
-                   VALUES (?,?,?,?,?,?,datetime('now'))""",
-                (code, "kline_day", k_start, k_end, k_days or 0, k_days or 0))
-        if t[0]:
-            db.execute(
-                """INSERT OR REPLACE INTO data_coverage
-                   (stock_code, data_type, coverage_start, coverage_end,
-                    total_days, filled_days, last_synced_at)
-                   VALUES (?,?,?,?,?,?,datetime('now'))""",
-                (code, "trend_data", t[0], t[0], t[1] or 0, t[1] or 0))
-        if f[0]:
-            db.execute(
-                """INSERT OR REPLACE INTO data_coverage
-                   (stock_code, data_type, coverage_start, coverage_end,
-                    total_days, filled_days, last_synced_at)
-                   VALUES (?,?,?,?,?,?,datetime('now'))""",
-                (code, "financial", None, None, f[0] or 0, f[0] or 0))
+        if persist:
+            if k_days:
+                db.execute(
+                    """INSERT OR REPLACE INTO data_coverage
+                       (stock_code, data_type, coverage_start, coverage_end,
+                        total_days, filled_days, last_synced_at)
+                       VALUES (?,?,?,?,?,?,datetime('now'))""",
+                    (code, "kline_day", k_start, k_end, k_days or 0, k_days or 0))
+            if t[0]:
+                db.execute(
+                    """INSERT OR REPLACE INTO data_coverage
+                       (stock_code, data_type, coverage_start, coverage_end,
+                        total_days, filled_days, last_synced_at)
+                       VALUES (?,?,?,?,?,?,datetime('now'))""",
+                    (code, "trend_data", t[0], t[0], t[1] or 0, t[1] or 0))
+            if f[0]:
+                db.execute(
+                    """INSERT OR REPLACE INTO data_coverage
+                       (stock_code, data_type, coverage_start, coverage_end,
+                        total_days, filled_days, last_synced_at)
+                       VALUES (?,?,?,?,?,?,datetime('now'))""",
+                    (code, "financial", None, None, f[0] or 0, f[0] or 0))
         rows.append({
             "股票": code,
             "K线天数": k_days or 0,
@@ -56,5 +59,6 @@ def compute_coverage(db: sqlite3.Connection) -> List[dict]:
             "分时点数": t[1] or 0,
             "财务期数": f[0] or 0,
         })
-    db.commit()
+    if persist:
+        db.commit()
     return rows

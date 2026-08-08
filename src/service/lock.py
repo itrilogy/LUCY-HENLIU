@@ -14,7 +14,7 @@ LOCK_FILE = Path(__file__).resolve().parent.parent.parent / "data" / "sync.lock"
 
 @contextmanager
 def single_instance(name: str = "同步"):
-    """同一时间只允许一个实例；已被占用时打印提示并退出。"""
+    """同一时间只允许一个实例；已被占用时以非零码退出（供调度器识别跳过）。"""
     LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
     f = open(LOCK_FILE, "w")
     try:
@@ -22,7 +22,7 @@ def single_instance(name: str = "同步"):
     except OSError:
         print(f"⚠️ 已有其他{name}进程在运行（{LOCK_FILE} 被占用），本次跳过",
               file=sys.stderr)
-        sys.exit(0)
+        sys.exit(1)  # 非零退出码：scheduler 可据此识别"被跳过"而非同步失败
     try:
         yield
     finally:

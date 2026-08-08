@@ -423,16 +423,18 @@ class PatternDiscoveryEngine:
 
     @staticmethod
     def _is_significant(hits: int, total: int, min_samples: int = 10,
-                        alpha: float = 0.05) -> bool:
+                        alpha: float = 0.05, p0: float = 0.5) -> bool:
         """
-        二项检验：模式胜率是否显著高于 0.5（单侧，α=0.05）。
+        二项检验：模式胜率是否显著高于随机基准 p0（单侧，α=0.05）。
+        - 方向模式（up/down）随机基准 0.5
+        - flat 模式随机基准约 1/3（三分类随机概率），否则 flat 模式几乎不可能显著
         样本量不足或无 scipy 时退化为 min_samples 门槛。
         """
         if total < min_samples:
             return False
         try:
             from scipy.stats import binomtest
-            return binomtest(hits, total, p=0.5, alternative="greater").pvalue < alpha
+            return binomtest(hits, total, p=p0, alternative="greater").pvalue < alpha
         except ImportError:
             return total >= min_samples
 
@@ -508,10 +510,12 @@ class PatternDiscoveryEngine:
             hit_rate = stats["hits"] / stats["total"]
             # 衰减系数：样本越多越可信，但不超过0.6权重
             weight = min(0.6, hit_rate * min(1.0, stats["total"] / 10))
-            # 统计不显著的模式（样本不足或胜率不显著>0.5）权重减半
-            if not self._is_significant(stats["hits"], stats["total"]):
-                weight *= 0.5
+            # 统计不显著的模式（样本不足或胜率不显著高于随机基准）权重减半
+            # flat 模式的随机基准为 1/3（三分类），up/down 为 0.5
             dir_key = key.split("_")[-1]
+            p0 = 1 / 3 if dir_key == "flat" else 0.5
+            if not self._is_significant(stats["hits"], stats["total"], p0=p0):
+                weight *= 0.5
             if dir_key in pattern_votes:
                 pattern_votes[dir_key] += weight
         
@@ -689,24 +693,32 @@ class PatternDiscoveryEngine:
         correct = sum(r["correct"] for r in results)
         accuracy = correct / total if total > 0 else 0
         
-        # ── 交易模拟（含换仓成本）──
+        # ── 交易模拟（含换仓成本，按完整交易日序列逐日累乘）──
+        # 关键：step>1 时两次预测之间的交易日收益也必须计入净值，
+        # 否则 total_return/max_drawdown/sharpe 全部失真。
+        pred_map = {r["date"]: r["pred_dir"] for r in results}
         equity, position, trades = 1.0, 0, 0
         curve = [1.0]
-        for r in results:
-            target = 1 if r["pred_dir"] == "up" else 0
-            if target != position:
-                equity *= (1 - cost_pct / 100)
-                trades += 1
-                position = target
-            equity *= (1 + r["actual_ret"] / 100) if position else 1.0
+        for i in range(1, len(df)):
+            d = str(df.iloc[i]["trade_date"])
+            if d in pred_map:  # 该日是预测目标日 → 评估换仓信号
+                target = 1 if pred_map[d] == "up" else 0
+                if target != position:
+                    equity *= (1 - cost_pct / 100)
+                    trades += 1
+                    position = target
+            day_ret = df.iloc[i]["return"]
+            if position and isinstance(day_ret, (int, float)) and not pd.isna(day_ret):
+                equity *= (1 + day_ret / 100)
             curve.append(equity)
         curve = np.array(curve)
         # 最大回撤
         peak = np.maximum.accumulate(curve)
         max_drawdown = float(((curve - peak) / peak).min()) if len(curve) > 1 else 0.0
-        # 夏普比率（日收益年化，252 交易日）
+        # 夏普比率（日收益年化，252 交易日；无风险利率默认 0）
         rets = np.diff(curve) / curve[:-1] if len(curve) > 1 else np.array([0.0])
-        sharpe = float(rets.mean() / rets.std() * np.sqrt(252)) if rets.std() > 0 else 0.0
+        rf_daily = 0.0
+        sharpe = float((rets.mean() - rf_daily) / rets.std() * np.sqrt(252)) if rets.std() > 0 else 0.0
         # 分模式胜率（按预测使用的主要模式聚合）
         per_pattern: dict = {}
         for r in results:

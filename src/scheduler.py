@@ -53,8 +53,11 @@ def run_sync_and_notify() -> None:
                    f"耗时 {dur:.0f}s\n{summary}")
         else:
             err = r.stderr.strip()[-500:] if r.stderr else ""
-            notify("⚠️ QuantLab 同步异常",
-                   f"退出码 {r.returncode}，耗时 {dur:.0f}s\n{summary}\n{err}")
+            if "跳过" in (r.stderr or ""):
+                logger.info("同步被跳过（已有实例在运行），不告警")
+            else:
+                notify("⚠️ QuantLab 同步异常",
+                       f"退出码 {r.returncode}，耗时 {dur:.0f}s\n{summary}\n{err}")
     except subprocess.TimeoutExpired:
         notify("❌ QuantLab 同步超时", f"超过 {SYNC_TIMEOUT}s 未完成")
     except Exception as e:

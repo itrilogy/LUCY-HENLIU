@@ -26,7 +26,9 @@ def backup_db(db_path: str = "", keep_days: int = 14) -> Path:
 
     conn = sqlite3.connect(db_path)
     try:
-        conn.execute(f"VACUUM INTO '{target}'")
+        # VACUUM INTO 不支持绑定参数，需转义路径中的单引号
+        safe = str(target).replace("'", "''")
+        conn.execute(f"VACUUM INTO '{safe}'")
     finally:
         conn.close()
 
