@@ -419,6 +419,23 @@ class PatternDiscoveryEngine:
     
     # ── 预测 ──
     
+    # ── 模式显著性 ──
+
+    @staticmethod
+    def _is_significant(hits: int, total: int, min_samples: int = 10,
+                        alpha: float = 0.05) -> bool:
+        """
+        二项检验：模式胜率是否显著高于 0.5（单侧，α=0.05）。
+        样本量不足或无 scipy 时退化为 min_samples 门槛。
+        """
+        if total < min_samples:
+            return False
+        try:
+            from scipy.stats import binomtest
+            return binomtest(hits, total, p=0.5, alternative="greater").pvalue < alpha
+        except ImportError:
+            return total >= min_samples
+
     def predict(self) -> Optional[Prediction]:
         """增强预测：自适应阈值 + 集成投票 + 模式衰减"""
         if not self._loaded or self.df is None or len(self.df) < 30:
@@ -483,7 +500,7 @@ class PatternDiscoveryEngine:
             elif vr > 1.5 and ret < -th: direction_scores["down"] += 0.20; patterns_found.append("放量下跌")
             elif vr < 0.5 and abs(ret) < th*0.5: direction_scores["flat"] += 0.15; patterns_found.append("缩量盘整")
         
-        # 5. 历史模式集成（带衰减权重）
+        # 5. 历史模式集成（带衰减权重 + 显著性筛选）
         agg = self._aggregate_patterns()
         pattern_votes = {"up": 0, "down": 0, "flat": 0}
         for key, stats in agg.items():
@@ -491,6 +508,9 @@ class PatternDiscoveryEngine:
             hit_rate = stats["hits"] / stats["total"]
             # 衰减系数：样本越多越可信，但不超过0.6权重
             weight = min(0.6, hit_rate * min(1.0, stats["total"] / 10))
+            # 统计不显著的模式（样本不足或胜率不显著>0.5）权重减半
+            if not self._is_significant(stats["hits"], stats["total"]):
+                weight *= 0.5
             dir_key = key.split("_")[-1]
             if dir_key in pattern_votes:
                 pattern_votes[dir_key] += weight
@@ -610,16 +630,19 @@ class PatternDiscoveryEngine:
     
     # ── 历史回测 ──
     
-    def backtest(self, window: int = 60, step: int = 1) -> dict:
+    def backtest(self, window: int = 60, step: int = 1,
+                 cost_pct: float = 0.1) -> dict:
         """
         滑动窗口回测: 用历史数据模拟预测-反馈循环
-        
+
         参数:
             window: 训练窗口大小(交易日)
             step: 滑动步长
-            
+            cost_pct: 单次换仓交易成本（%），默认 0.1%（双边）
+
         返回:
-            {accuracy, total, correct, convergence, details: [{date, pred, actual, correct}]}
+            {accuracy, total, correct, total_return, max_drawdown, sharpe,
+             trades, per_pattern, details}
         """
         if not self._loaded or self.df is None or len(self.df) < window + 10:
             return {"error": f"数据不足: loaded={self._loaded}, len={len(self.df) if self.df is not None else 0}, need={window+10}"}
@@ -653,7 +676,9 @@ class PatternDiscoveryEngine:
                 "date": str(actual["trade_date"]),
                 "pred_dir": pred.direction,
                 "actual_dir": actual_dir,
-                "confidence": pred.confidence,
+                "actual_ret": round(actual_ret, 3),
+                "confidence": round(pred.confidence, 3),
+                "pattern": (pred.patterns_used[0] if pred.patterns_used else "无"),
                 "correct": correct
             })
         
@@ -664,10 +689,45 @@ class PatternDiscoveryEngine:
         correct = sum(r["correct"] for r in results)
         accuracy = correct / total if total > 0 else 0
         
+        # ── 交易模拟（含换仓成本）──
+        equity, position, trades = 1.0, 0, 0
+        curve = [1.0]
+        for r in results:
+            target = 1 if r["pred_dir"] == "up" else 0
+            if target != position:
+                equity *= (1 - cost_pct / 100)
+                trades += 1
+                position = target
+            equity *= (1 + r["actual_ret"] / 100) if position else 1.0
+            curve.append(equity)
+        curve = np.array(curve)
+        # 最大回撤
+        peak = np.maximum.accumulate(curve)
+        max_drawdown = float(((curve - peak) / peak).min()) if len(curve) > 1 else 0.0
+        # 夏普比率（日收益年化，252 交易日）
+        rets = np.diff(curve) / curve[:-1] if len(curve) > 1 else np.array([0.0])
+        sharpe = float(rets.mean() / rets.std() * np.sqrt(252)) if rets.std() > 0 else 0.0
+        # 分模式胜率（按预测使用的主要模式聚合）
+        per_pattern: dict = {}
+        for r in results:
+            p = r["pattern"]
+            if p not in per_pattern:
+                per_pattern[p] = {"hits": 0, "total": 0}
+            per_pattern[p]["hits"] += r["correct"]
+            per_pattern[p]["total"] += 1
+        per_pattern = {p: {**s, "rate": round(s["hits"] / s["total"], 3)}
+                       for p, s in sorted(per_pattern.items(),
+                                          key=lambda kv: -kv[1]["hits"] / max(kv[1]["total"], 1))[:5]}
+        
         return {
             "total": total,
             "correct": correct,
             "accuracy": round(accuracy, 4),
+            "total_return": round(equity - 1, 4),
+            "max_drawdown": round(max_drawdown, 4),
+            "sharpe": round(sharpe, 3),
+            "trades": trades,
+            "per_pattern": per_pattern,
             "details": results[-30:],  # 最近30条
             "engine_version": self.version
         }

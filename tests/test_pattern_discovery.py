@@ -51,6 +51,19 @@ def test_backtest_returns_metrics():
     assert "total" in bt and "accuracy" in bt
     assert bt["total"] > 0
     assert 0.0 <= bt["accuracy"] <= 1.0
+    # 增强指标：成本模型/回撤/夏普/分模式胜率
+    for k in ("total_return", "max_drawdown", "sharpe", "trades", "per_pattern"):
+        assert k in bt, f"缺少回测绩效指标 {k}"
+    assert -1.0 <= bt["max_drawdown"] <= 0.0
+
+
+def test_backtest_cost_reduces_return():
+    pde = PatternDiscoveryEngine("000037")
+    pde.fit(_make_kline(120))
+    bt0 = pde.backtest(window=50, step=5, cost_pct=0.0)
+    bt1 = pde.backtest(window=50, step=5, cost_pct=0.5)
+    # 含成本（多换仓）的累计收益不高于无成本版本
+    assert bt1["total_return"] <= bt0["total_return"] + 1e-9
 
 
 def test_backtest_with_too_short_data():
@@ -58,3 +71,15 @@ def test_backtest_with_too_short_data():
     pde.fit(_make_kline(30))
     bt = pde.backtest(window=50, step=5)
     assert "error" in bt or bt.get("total", 0) == 0  # 数据不足时不崩溃
+
+
+def test_pattern_significance():
+    pde = PatternDiscoveryEngine("000037")
+    # 样本不足 → 不显著
+    assert not pde._is_significant(4, 4)
+    # 8/10 胜率 0.8，p=0.0547 > 0.05 → 不显著（临界）
+    assert not pde._is_significant(8, 10)
+    # 9/10 胜率 0.9，p=0.0107 < 0.05 → 显著
+    assert pde._is_significant(9, 10)
+    # 15/20 胜率 0.75，p≈0.021 → 显著
+    assert pde._is_significant(15, 20)

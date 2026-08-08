@@ -415,6 +415,20 @@ def main():
                                      tuple(kdf.itertuples(index=False, name=None)))
                 if 'accuracy' in bt:
                     st.caption(f"回测准确率: {bt['accuracy']*100:.1f}% ({bt['correct']}/{bt['total']}) · 模式库: {summ['patterns_found']}条 · 收敛: {'✅ 收敛' if summ['is_converged'] else '⏳ 训练中'}")
+                    with st.expander("📈 回测绩效（含交易成本）"):
+                        c1, c2, c3, c4 = st.columns(4)
+                        c1.metric("累计收益", f"{bt.get('total_return', 0)*100:.1f}%")
+                        c2.metric("最大回撤", f"{bt.get('max_drawdown', 0)*100:.1f}%")
+                        c3.metric("夏普比率", f"{bt.get('sharpe', 0):.2f}")
+                        c4.metric("换仓次数", f"{bt.get('trades', 0)}")
+                        pp = bt.get("per_pattern") or {}
+                        if pp:
+                            st.markdown("**分模式胜率 Top5**")
+                            st.dataframe(pd.DataFrame(
+                                [{"模式": k, "胜率": f"{v['rate']*100:.1f}%",
+                                  "样本": v["total"], "命中": v["hits"]}
+                                 for k, v in pp.items()]),
+                                use_container_width=True, hide_index=True)
         else:
             st.info("需要≥50个交易日数据训练预测模型")
 
