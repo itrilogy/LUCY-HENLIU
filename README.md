@@ -1,0 +1,94 @@
+# QuantLab — 量化交易分析工具
+
+> 基于国投证券(行情) + 国信证券(财务)双数据源的本地量化分析平台。
+> 每只股票独立的模式发现引擎，通过预测→反馈→迭代收敛实现自适应学习。
+
+## 数据全景
+
+| 数据类型 | 覆盖范围 | 数据源 |
+|:---------|:---------|:-------|
+| 📊 实时行情 | 26只股票，15+字段 | 国投证券 |
+| 📈 日K线 | 26只×120天 | 国投证券 |
+| ⏱ 分时走势 | 25只×266分时点 | 国投证券 |
+| 📋 财务报表 | 23只×20期(5年) | 国信证券 |
+| 🧠 模式库 | 277条可重复模式 | 自发现 |
+
+## 快速启动
+
+> 运行环境：直接使用系统 Python 3（本机已验证 Python 3.14 + sklearn 1.9 / pandas 3.0），**不创建 venv**。
+
+```bash
+# 1. 安装依赖到系统 Python（含量化引擎所需 scikit-learn）
+pip install -r requirements.txt
+
+# 2. 配置 API Key（首次运行任一步骤都会自动建表，无需手动初始化）
+cp config/.env.example config/.env   # 在网页获取 API Key
+
+# 3. 数据同步（首次先全量，之后每日用 sync_daily.py）
+python3 src/sync_now.py               # 全量同步 (行情+K线)
+python3 src/sync_trend.py             # 分时同步
+python3 src/sync_financial.py         # 财务同步
+python3 src/sync_daily.py             # 一键全量（含研报/选股/预测闭环）
+
+# 4. 启动 UI
+streamlit run src/main.py
+```
+
+> 所有 sync 脚本和 UI 入口都会自动执行 `src/db/schema.py` 的 `init_db()`，
+> 数据库表结构统一由 `src/db/schema.py` 管理。
+
+## 功能模块
+
+| 标签 | 功能 | 算法 |
+|:-----|:-----|:-----|
+| 📊 因子&信号 | 6大因子评分 + 组合概览 + 下一日预测 | PatternDiscovery v2.0 |
+| 📈 技术图表 | K线 + MA + RSI + MACD + 布林带 | Plotly |
+| 📋 量化分析 | GMM状态分类 + 马尔可夫链 + 动量矩阵 | sklearn |
+| 💹 财务趋势 | 营收/净利润/ROE趋势 | 国信API |
+| 🏷️ 操作 | 持仓切换 + 数据状态 | — |
+
+## 架构
+
+```
+src/
+├── main.py                    # Streamlit UI
+├── sync_daily.py              # 一键全量同步（行情+K线+分时+财务+研报+预测闭环）
+├── sync_now.py                # 全量同步脚本（行情+K线）
+├── sync_trend.py              # 分时同步脚本
+├── sync_financial.py          # 财务同步脚本
+├── sync_extra.py              # 辅助数据（行业拥挤度/宏观/资金流向）
+├── sync_macro_public.py       # 公开宏观历史数据回填
+├── sync_research_history.py   # 历史研报回填
+├── datasource/
+│   ├── sdicsc_client.py       # 国投证券 API
+│   └── gs_client.py           # 国信证券 API
+├── quant/
+│   ├── engine.py              # 量化分析引擎（GMM/马尔可夫/动量）
+│   ├── pattern_discovery.py   # 模式发现引擎 (v2.0)
+│   └── prediction_loop.py     # 预测-反馈闭环（结算+新预测）
+├── analyst/
+│   └── research.py            # AI 研报引擎（宏观问答+标签分类）
+├── db/
+│   └── schema.py              # 数据库统一 DDL（24 张表）
+└── service/
+    └── sync.py                # 同步调度服务（K线补全/间隙修复/财务补拉）
+```
+
+## 收敛预测闭环
+
+每只股票独立的 PatternDiscoveryEngine 通过历史K线发现可重复模式。
+`src/sync_daily.py` 每次同步后自动执行 `src/quant/prediction_loop.py`：
+
+```
+生成预测 → 存入 prediction_log → 次日K线到达 → 结算(对比实际) → 收敛提升
+```
+
+- **结算**：用最新收盘价回填到期预测的 `actual_*` 字段，统计命中率
+- **新预测**：基于最新状态生成下一交易日预测入库
+- 当前平均准确率约 33%，随数据积累逐步提升
+
+## 说明
+
+- SSL：所有 HTTPS 请求保持证书验证；国信服务器仅支持 legacy renegotiation，
+  已通过 `OP_LEGACY_SERVER_CONNECT` 显式兼容（而非关闭验证）。
+- 敏感配置 `config/.env` 已被 `.gitignore` 排除，请勿提交真实 Key。

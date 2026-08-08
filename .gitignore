@@ -1,0 +1,16 @@
+# 敏感信息
+config/.env
+
+# 数据与运行产物
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# 编辑器和系统
+.DS_Store
