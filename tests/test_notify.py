@@ -1,4 +1,5 @@
 """通知与调度测试（mock 外部端点，不真发消息）"""
+import json
 import logging
 import sys
 from unittest.mock import patch
@@ -44,11 +45,12 @@ def test_weixin_posts_json_with_token(monkeypatch):
     with patch("urllib.request.urlopen", return_value=FakeResp()) as mock_req:
         _weixin("标题", "内容")
     mock_req.assert_called_once()
-    # 请求包含 token 与内容
+    # 请求包含 token 与内容（JSON 体解析校验）
     call = mock_req.call_args[0][0]
-    body = call.data.decode("utf-8")
-    assert "test-token" in body
-    assert "标题" in body
+    payload = json.loads(call.data.decode("utf-8"))
+    assert payload["token"] == "test-token"
+    assert payload["title"] == "标题"
+    assert "内容" in payload["content"]
 
 
 def test_is_trading_day():
