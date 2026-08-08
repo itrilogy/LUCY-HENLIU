@@ -89,6 +89,39 @@ def toggle_holding(db, code):
     db.execute("UPDATE portfolio_stock SET is_holding=1-is_holding WHERE stock_code=?",(code,)); db.commit()
     st.cache_data.clear()
 
+def guess_market(code: str) -> str:
+    """按代码前缀推断市场（6/5→SH，0/1/3→SZ，4/8→BJ，H→HK）"""
+    c = code.strip().upper()
+    if c.startswith("H"): return "HK"
+    if c[0] in "56": return "SH"
+    if c[0] in "48": return "BJ"
+    return "SZ"
+
+def add_stock(db, code: str) -> str:
+    """添加自选股：调用行情 API 验证股票存在，写入 stock_basic + portfolio_stock"""
+    code = code.strip().upper()
+    if not code: return "请输入股票代码"
+    if db.execute("SELECT 1 FROM portfolio_stock WHERE stock_code=?", (code,)).fetchone():
+        return f"{code} 已在自选中"
+    try:
+        from src.datasource.sdicsc_client import get_quote
+        q = get_quote(code)
+        name = q.get("name") or code
+        market = guess_market(code)
+    except Exception as e:
+        return f"股票验证失败: {e}"
+    db.execute("INSERT OR IGNORE INTO stock_basic (stock_code,name,market) VALUES (?,?,?)", (code, name, market))
+    db.execute("INSERT OR IGNORE INTO portfolio_stock (portfolio_id,stock_code,market,is_holding) VALUES (1,?,?,0)", (code, market))
+    db.commit()
+    st.cache_data.clear()
+    return f"✅ 已添加 {name} ({code})"
+
+def remove_stock(db, code: str):
+    """从自选移除（保留历史行情/K线数据）"""
+    db.execute("DELETE FROM portfolio_stock WHERE stock_code=?", (code,))
+    db.commit()
+    st.cache_data.clear()
+
 @st.cache_data(ttl=600)
 def cached_backtest(code: str, last_date: str, cols: tuple, rows: tuple) -> dict:
     """滑动窗口回测（缓存：K线数据未更新则不重算，避免每次渲染全量重跑）"""
@@ -557,11 +590,34 @@ def main():
         if st.button("📌 切换持仓", use_container_width=True):
             toggle_holding(db, sel_code); st.rerun()
         st.divider()
+        st.markdown("**📌 自选股管理**")
+        new_code = st.text_input("添加股票代码（如 600519 / 000001）", key="add_stock_input")
+        if st.button("➕ 添加自选", use_container_width=True):
+            if new_code:
+                msg = add_stock(db, new_code)
+                st.toast(msg)
+                if "已添加" in msg:
+                    st.rerun()
+        watch_codes = [r[0] for r in db.execute("SELECT stock_code FROM portfolio_stock ORDER BY stock_code").fetchall()]
+        if watch_codes:
+            del_code = st.selectbox("从自选移除", watch_codes, key="del_stock_sel")
+            if st.button("🗑 移除自选", use_container_width=True):
+                remove_stock(db, del_code)
+                st.toast(f"已移除 {del_code}"); st.rerun()
+        st.divider()
         st.markdown("**数据状态**")
         st.caption(f"K线: {len(kdf)} 天")
         st.caption(f"财务: {len(fdf)} 期")
         ls = db.execute("SELECT MAX(fetched_at) FROM real_time_quote").fetchone()[0]
         if ls: st.caption(f"更新于: {ls[11:19]}")
+        st.divider()
+        with st.expander("📊 数据覆盖率"):
+            from src.service.coverage import compute_coverage
+            cov = compute_coverage(db)
+            if cov:
+                st.dataframe(pd.DataFrame(cov), use_container_width=True, hide_index=True)
+            else:
+                st.caption("暂无自选股")
         st.divider()
         st.markdown("**📤 数据导出**")
         if st.button("导出行情CSV", use_container_width=True):
