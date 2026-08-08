@@ -83,3 +83,13 @@ def test_pattern_significance():
     assert pde._is_significant(9, 10)
     # 15/20 胜率 0.75，p≈0.021 → 显著
     assert pde._is_significant(15, 20)
+
+
+def test_pattern_significance_flat_baseline():
+    """flat 模式使用 1/3 随机基准（三分类），不应按 0.5 判定"""
+    pde = PatternDiscoveryEngine("000037")
+    # 12/30 @ p0=0.5：P(X>=12|0.5) 大（不显著）；@ p0=1/3：显著
+    # 关键断言：p0 参数确实改变判定
+    r50 = pde._is_significant(12, 30, p0=0.5)
+    r33 = pde._is_significant(12, 30, p0=1 / 3)
+    assert r33 and not r50
