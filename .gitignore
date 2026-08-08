@@ -14,3 +14,6 @@ __pycache__/
 
 # 编辑器和系统
 .DS_Store
+
+# Reasonix 内部元数据
+.reasonix/
