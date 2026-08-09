@@ -130,7 +130,19 @@ streamlit run src/main.py                # UI
 
 ---
 
-## 九、Git 提交历史（13 次）
+## 十、版权与声明（2026-08-08 补充）
+
+- **开源协议**：MIT（`LICENSE`，Copyright (c) 2026 鹿溪联合创新实验室）
+- **品牌资产**：`src/assets/logo.svg`（32×32 概念瓦片，设计注释内嵌）+ `favicon.ico / favicon-16x16.png / favicon-32x32.png / apple-touch-icon.png`
+  （由 `scripts/generate_assets.py` 用 Pillow 生成，几何与 SVG 同源，可复现）
+- **Logo 语义**：深空蓝底=量化研究的沉稳底色 · K线蜡烛=行情分析对象 · 上升箭头=量化发现趋势 ·
+  扫描线=算法逐点分析 · 星点=策略灵感
+- **UI 声明**：侧边栏页脚「QuantLab © 2026 鹿溪联合创新实验室 · 数据仅供参考，不构成投资建议」
+- **完整声明**见 `README.md`「📜 版权与数据声明」（版权/数据来源/免责/依赖致谢/API Key 规范）
+
+---
+
+## Git 提交历史（14 次）
 
 ```
 8779cee init: QuantLab 量化分析平台（修复后基线）

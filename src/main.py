@@ -26,7 +26,8 @@ from src.db.schema import init_db
 UP, DOWN, FLAT = "#ef4444", "#22c55e", "#94a3b8"
 BG, CARD = "#0f172a", "#1e293b"
 TEXT, MUTED, ACCENT = "#e2e8f0", "#64748b", "#3b82f6"
-st.set_page_config(page_title="QuantLab", layout="wide")
+st.set_page_config(page_title="QuantLab", layout="wide",
+                   page_icon=str(Path(__file__).parent / "assets" / "favicon-32x32.png"))
 st.markdown(f"""<style>
 .stApp {{ background:{BG}; color:{TEXT}; }}
 .stButton>button {{ background:{ACCENT}; color:white; border:none; border-radius:4px; }}
@@ -670,6 +671,9 @@ def main():
         st.caption(f"财务: {db.execute('SELECT COUNT(*) FROM financial_statement').fetchone()[0]} 条")
         st.caption(f"研报: {db.execute('SELECT COUNT(*) FROM research_article').fetchone()[0]} 篇")
         st.caption(f"模式: {db.execute('SELECT COUNT(*) FROM pattern_library').fetchone()[0]} 条")
+        st.divider()
+        st.caption("QuantLab © 2026 鹿溪联合创新实验室")
+        st.caption("数据仅供参考，不构成投资建议")
 
 if __name__ == "__main__":
     main()
