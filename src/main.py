@@ -24,19 +24,41 @@ from src.db.schema import init_db
 
 # ── 配色 ────────────────────────────────────────
 UP, DOWN, FLAT = "#ef4444", "#22c55e", "#94a3b8"
-BG, CARD = "#0f172a", "#1e293b"
-TEXT, MUTED, ACCENT = "#e2e8f0", "#64748b", "#3b82f6"
+BG, CARD = "#0f172a", "#3a4c68"
+TEXT, MUTED, ACCENT = "#e2e8f0", "#8fa3bf", "#60a5fa"
+GRID = "#2e3f5c"                       # 图表网格（隐约可辨）
+UP_FILL, DOWN_FILL = "rgba(239,68,68,0.45)", "rgba(34,197,94,0.45)"  # 蜡烛半透明
 st.set_page_config(page_title="QuantLab", layout="wide",
                    page_icon=str(Path(__file__).parent / "assets" / "favicon-32x32.png"))
 st.markdown(f"""<style>
+/* Streamlit 主题变量：统一全部组件的前景/背景色（修复组件默认深灰文字落在深色背景上对比不足） */
+:root {{
+  --text-color: {TEXT};
+  --background-color: {BG};
+  --secondary-background-color: {CARD};
+  --primary-color: {ACCENT};
+}}
 .stApp {{ background:{BG}; color:{TEXT}; }}
-.stButton>button {{ background:{ACCENT}; color:white; border:none; border-radius:4px; }}
+.stButton>button {{ background:{ACCENT}; color:#0f172a; font-weight:600; border:none; border-radius:4px; }}
 h1,h2,h3, .stMarkdown {{ color:{TEXT} !important; }}
+/* 弱文字与指标 */
 .stMetric label {{ color:{MUTED} !important; }}
-div[data-testid="stMetricValue"] {{ font-size:1.2rem !important; }}
-.stSelectbox div[data-baseweb="select"] {{ background:{CARD}; border-color:{MUTED}; }}
-section[data-testid="stSidebar"] {{ background:{CARD}; }}
-.stDataFrame {{ background:{CARD}; }}
+div[data-testid="stMetricValue"] {{ color:{TEXT} !important; font-size:1.2rem !important; }}
+div[data-testid="stCaptionContainer"] p {{ color:{MUTED} !important; }}
+/* Tab 标签（未选中/选中） */
+[data-testid="stTabs"] button {{ color:{MUTED} !important; }}
+[data-testid="stTabs"] button[aria-selected="true"] {{ color:{TEXT} !important; }}
+/* 折叠面板标题 */
+[data-testid="stExpander"] summary, [data-testid="stExpander"] summary p {{ color:{TEXT} !important; }}
+/* 输入/选择控件文字 */
+.stSelectbox div[data-baseweb="select"] {{ background:{CARD}; border-color:#40536e; }}
+.stSelectbox div[data-baseweb="select"] span, .stSelectbox div[data-baseweb="select"] div {{ color:{TEXT} !important; }}
+.stTextInput input, .stTextArea textarea {{ background:{CARD}; color:{TEXT} !important; border-color:#40536e; }}
+.stRadio label, .stCheckbox label {{ color:{TEXT} !important; }}
+/* 数据表格单元格 */
+div[data-testid="stDataFrame"] {{ background:{CARD}; color:{TEXT}; }}
+div[data-testid="stDataFrame"] td, div[data-testid="stDataFrame"] th {{ color:{TEXT} !important; }}
+section[data-testid="stSidebar"] {{ background:{CARD}; border-right:1px solid #40536e; }}
 </style>""", unsafe_allow_html=True)
 
 # ── 数据库 ──────────────────────────────────────
@@ -190,8 +212,10 @@ def plot_quant_kline(df, name):
     fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.02,
                          row_heights=[0.5,0.15,0.35])
     fig.add_trace(go.Candlestick(x=df["trade_date"],open=df["open"],high=df["high"],
-                  low=df["low"],close=df["close"],name="",showlegend=False), row=1, col=1)
-    for m,c,n in [(5,"#f97316","MA5"),(20,"#3b82f6","MA20"),(60,"#8b5cf6","MA60")]:
+                  low=df["low"],close=df["close"],name="",showlegend=False,
+                  increasing_line_color=UP, increasing_fillcolor=UP_FILL,
+                  decreasing_line_color=DOWN, decreasing_fillcolor=DOWN_FILL), row=1, col=1)
+    for m,c,n in [(5,"#f97316","MA5"),(20,"#facc15","MA20"),(60,"#8b5cf6","MA60")]:
         if len(df) >= m: fig.add_trace(go.Scatter(x=df["trade_date"],y=df["close"].rolling(m).mean(),
                       line=dict(color=c,width=1),name=n), row=1, col=1)
     bc = [UP if r["close"]>=r["open"] else DOWN for _,r in df.iterrows()]
@@ -199,13 +223,13 @@ def plot_quant_kline(df, name):
     rsi = calc_rsi(df)
     if rsi is not None:
         t = df["trade_date"].values[-len(rsi):]
-        fig.add_trace(go.Scatter(x=t, y=rsi, line=dict(color="#8b5cf6",width=1),name="RSI(14)"), row=3, col=1)
+        fig.add_trace(go.Scatter(x=t, y=rsi, line=dict(color="#22d3ee",width=1),name="RSI(14)"), row=3, col=1)
         fig.add_hline(y=70, line_dash="dash", line_color=UP, row=3, col=1)
         fig.add_hline(y=30, line_dash="dash", line_color=DOWN, row=3, col=1)
     fig.update_layout(height=450, template="plotly_dark", margin=dict(l=10,r=10,t=10,b=10),
                       xaxis_rangeslider_visible=False, hovermode="x unified",
                       paper_bgcolor=BG, plot_bgcolor=BG, font=dict(color=TEXT))
-    fig.update_xaxes(gridcolor="#1e293b"); fig.update_yaxes(gridcolor="#1e293b")
+    fig.update_xaxes(gridcolor=GRID); fig.update_yaxes(gridcolor=GRID)
     return fig
 
 def calc_rsi(df, n=14):
@@ -217,7 +241,7 @@ def plot_fin_trend(df):
     if df.empty: return None
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df["period"],y=df["revenue"]/1e8,mode="lines+markers",name="营收(亿)",line=dict(color="#3b82f6")))
-    fig.add_trace(go.Scatter(x=df["period"],y=df["net_profit"]/1e8,mode="lines+markers",name="净利润(亿)",line=dict(color="#22c55e")))
+    fig.add_trace(go.Scatter(x=df["period"],y=df["net_profit"]/1e8,mode="lines+markers",name="净利润(亿)",line=dict(color="#f59e0b")))
     fig.update_layout(height=250, template="plotly_dark", margin=dict(l=10,r=10,t=10,b=10),
                       paper_bgcolor=BG, plot_bgcolor=BG, font=dict(color=TEXT,size=10),
                       xaxis=dict(gridcolor="#1e293b"), yaxis=dict(gridcolor="#1e293b"))
@@ -346,7 +370,7 @@ def main():
             is_sel = row_val == sel_code
         except (KeyError, IndexError):
             is_sel = False
-        return ["background-color: #1e3a5f"] * len(s) if is_sel else [""] * len(s)
+        return ["background-color: #2e4d7d"] * len(s) if is_sel else [""] * len(s)
     
     st.dataframe(display.style.apply(highlight, axis=1),
                  use_container_width=True, height=200,
