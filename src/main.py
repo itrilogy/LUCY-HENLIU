@@ -45,14 +45,15 @@ h1,h2,h3, .stMarkdown {{ color:{TEXT} !important; }}
 .stMetric label {{ color:{MUTED} !important; }}
 div[data-testid="stMetricValue"] {{ color:{TEXT} !important; font-size:1.2rem !important; }}
 div[data-testid="stCaptionContainer"] p {{ color:{MUTED} !important; }}
-/* Tab 标签（未选中/选中） */
-[data-testid="stTabs"] button {{ color:{MUTED} !important; }}
-[data-testid="stTabs"] button[aria-selected="true"] {{ color:{TEXT} !important; }}
+/* Tab 标签（Streamlit 1.60：tab 为 div[data-testid="stTab"]，非 button） */
+[data-testid="stTabs"] [data-testid="stTab"] {{ color:{MUTED} !important; }}
+[data-testid="stTabs"] [data-testid="stTab"][aria-selected="true"] {{ color:{TEXT} !important; }}
 /* 折叠面板标题 */
 [data-testid="stExpander"] summary, [data-testid="stExpander"] summary p {{ color:{TEXT} !important; }}
-/* 输入/选择控件文字 */
+/* 输入/选择控件文字（selectbox 为 React Aria ComboBox 结构） */
 .stSelectbox div[data-baseweb="select"] {{ background:{CARD}; border-color:#40536e; }}
 .stSelectbox div[data-baseweb="select"] span, .stSelectbox div[data-baseweb="select"] div {{ color:{TEXT} !important; }}
+[data-testid="stSelectbox"] input, [data-testid="stSelectbox"] [role="combobox"] {{ color:{TEXT} !important; }}
 .stTextInput input, .stTextArea textarea {{ background:{CARD}; color:{TEXT} !important; border-color:#40536e; }}
 .stRadio label, .stCheckbox label {{ color:{TEXT} !important; }}
 /* 数据表格单元格 */
