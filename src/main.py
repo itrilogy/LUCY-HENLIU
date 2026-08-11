@@ -56,6 +56,10 @@ div[data-testid="stCaptionContainer"] p {{ color:{MUTED} !important; }}
 [data-testid="stSelectbox"] input, [data-testid="stSelectbox"] [role="combobox"] {{ color:{TEXT} !important; }}
 .stTextInput input, .stTextArea textarea {{ background:{CARD}; color:{TEXT} !important; border-color:#40536e; }}
 .stRadio label, .stCheckbox label {{ color:{TEXT} !important; }}
+/* 控件标签（stWidgetLabel：selectbox/textinput/multiselect 等的标题）：
+   修复浅色主题深灰文字残留（如「当前分析标的」「分类」） */
+[data-testid="stWidgetLabel"] {{ color:{TEXT} !important; }}
+[data-testid="stWidgetLabel"] p {{ color:{TEXT} !important; }}
 /* ── 输入控件统一规范（全局）：背景/边框/文字/占位符 ── */
 /* 输入区：比卡片深一档的内凹背景 + 1px 边框，与页面/卡片形成三级层次 */
 [data-testid="stSelectbox"] [role="combobox"],
