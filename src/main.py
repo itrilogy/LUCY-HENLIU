@@ -56,6 +56,45 @@ div[data-testid="stCaptionContainer"] p {{ color:{MUTED} !important; }}
 [data-testid="stSelectbox"] input, [data-testid="stSelectbox"] [role="combobox"] {{ color:{TEXT} !important; }}
 .stTextInput input, .stTextArea textarea {{ background:{CARD}; color:{TEXT} !important; border-color:#40536e; }}
 .stRadio label, .stCheckbox label {{ color:{TEXT} !important; }}
+/* ── 输入控件统一规范（全局）：背景/边框/文字/占位符 ── */
+/* 输入区：比卡片深一档的内凹背景 + 1px 边框，与页面/卡片形成三级层次 */
+[data-testid="stSelectbox"] [role="combobox"],
+[data-testid="stSelectbox"] input,
+[data-testid="stMultiselect"] input,
+[data-testid="stNumberInput"] input,
+.stTextInput input,
+.stTextArea textarea {{
+  background:#263449 !important;
+  border:1px solid #40536e !important;
+  border-radius:6px !important;
+  color:{TEXT} !important;
+}}
+input::placeholder, textarea::placeholder {{ color:{MUTED} !important; }}
+/* 下拉列表弹出层（React Aria portal） */
+#stFloatingOverlayPortal [role="listbox"],
+#portal [role="listbox"] {{
+  background:#263449 !important;
+  color:{TEXT} !important;
+  border:1px solid #40536e !important;
+  border-radius:6px !important;
+}}
+#stFloatingOverlayPortal [role="option"],
+#portal [role="option"] {{ color:{TEXT} !important; }}
+#stFloatingOverlayPortal [role="option"][aria-selected="true"],
+#portal [role="option"][aria-selected="true"] {{
+  background:rgba(96,165,250,0.25) !important;
+  color:{TEXT} !important;
+}}
+/* 单选框/复选框：深色胶囊（修复浅色主题白底残留） */
+[data-testid="stRadio"] [role="radio"] {{
+  color:{TEXT} !important;
+  background:transparent !important;
+}}
+[data-testid="stRadio"] [role="radio"][aria-checked="true"] {{
+  color:{ACCENT} !important;
+  background:rgba(96,165,250,0.12) !important;
+}}
+[data-testid="stCheckbox"] label {{ color:{TEXT} !important; }}
 /* 数据表格单元格 */
 div[data-testid="stDataFrame"] {{ background:{CARD}; color:{TEXT}; }}
 div[data-testid="stDataFrame"] td, div[data-testid="stDataFrame"] th {{ color:{TEXT} !important; }}
