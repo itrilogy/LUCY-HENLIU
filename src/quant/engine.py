@@ -1,5 +1,5 @@
 """
-QuantLab — 量化分析引擎
+衡流 · HengLiu（QuantFlow）— 量化分析引擎
 提供: GMM市场状态分类、马尔可夫转移矩阵、动量分析、因子评分
 """
 
@@ -119,10 +119,11 @@ class MarkovTransition:
         for t in range(len(discretized) - 1):
             trans_mat[discretized[t], discretized[t+1]] += 1
         
-        # 归一化为概率
+        # 归一化为概率；空行用均匀分布，避免 [0,0,0]
         row_sums = trans_mat.sum(axis=1, keepdims=True)
-        row_sums = np.where(row_sums == 0, 1, row_sums)
-        self.transition_matrix = trans_mat / row_sums
+        self.transition_matrix = np.divide(
+            trans_mat, row_sums, out=np.full_like(trans_mat, 1 / 3),
+            where=row_sums != 0)
         
         # 稳态分布（特征向量法）
         eigvals, eigvecs = np.linalg.eig(self.transition_matrix.T)
@@ -220,11 +221,12 @@ class PortfolioAnalyzer:
     @staticmethod
     def correlation_matrix(kline_dict: dict) -> Optional[pd.DataFrame]:
         """多只股票收益率相关性矩阵"""
-        returns = {}
+        series = []
         for code, df in kline_dict.items():
             if df is not None and len(df) > 20:
-                r = df.sort_values("trade_date")["close"].pct_change() * 100
-                returns[code] = r
-        if len(returns) < 2:
+                s = df.sort_values("trade_date").set_index("trade_date")["close"].pct_change() * 100
+                s.name = code
+                series.append(s)
+        if len(series) < 2:
             return None
-        return pd.DataFrame(returns).corr()
+        return pd.concat(series, axis=1).corr()

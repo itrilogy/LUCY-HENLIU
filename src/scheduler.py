@@ -18,6 +18,7 @@ from pathlib import Path
 
 import schedule
 
+from src.service.calendar import is_trading_day as _cal_trading_day
 from src.service.logging_setup import setup_logging
 from src.service.notify import notify
 
@@ -29,10 +30,9 @@ SYNC_TIME = "15:30"
 SYNC_TIMEOUT = 1800  # 秒
 
 
-def is_trading_day(d: datetime | None = None) -> bool:
-    """简易交易日判断：周一至周五。法定节假日未覆盖（已知限制）。"""
-    d = d or datetime.now()
-    return d.weekday() < 5
+def is_trading_day(d=None) -> bool:
+    """周末 + 法定休市（CLOSED_DATES）。有库时也可传入 db 读 trade_calendar。"""
+    return _cal_trading_day(d, db=None)
 
 
 def run_sync_and_notify() -> None:
@@ -49,19 +49,22 @@ def run_sync_and_notify() -> None:
         tail = [ln for ln in r.stdout.strip().splitlines() if ln.strip()][-8:]
         summary = "\n".join(tail) if tail else "(无输出)"
         if r.returncode == 0:
-            notify("✅ QuantLab 每日同步完成",
+            notify("✅ 衡流每日同步完成",
                    f"耗时 {dur:.0f}s\n{summary}")
+        elif r.returncode == 2:
+            notify("⚠️ 衡流同步部分失败",
+                   f"退出码 2，耗时 {dur:.0f}s\n{summary}")
         else:
             err = r.stderr.strip()[-500:] if r.stderr else ""
             if "跳过" in (r.stderr or ""):
                 logger.info("同步被跳过（已有实例在运行），不告警")
             else:
-                notify("⚠️ QuantLab 同步异常",
+                notify("⚠️ 衡流同步异常",
                        f"退出码 {r.returncode}，耗时 {dur:.0f}s\n{summary}\n{err}")
     except subprocess.TimeoutExpired:
-        notify("❌ QuantLab 同步超时", f"超过 {SYNC_TIMEOUT}s 未完成")
+        notify("❌ 衡流同步超时", f"超过 {SYNC_TIMEOUT}s 未完成")
     except Exception as e:
-        notify("❌ QuantLab 同步失败", str(e))
+        notify("❌ 衡流同步失败", str(e))
 
 
 def main() -> None:

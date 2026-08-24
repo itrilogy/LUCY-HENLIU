@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="衡流 · HengLiu">
+  <!--
+    衡流 · HengLiu (QuantFlow) 产品 favicon（鹿溪 CI）
+    - 鹿溪绿底 #0D5E42：实验室品牌
+    - 马尔可夫状态环：GMM / 状态分类
+    - K 线波段：行情对象
+    - 进化蓝流线：流向自明
+    - 模式金点 #F1C40F：显著模式
+    - 源启星：洞察
+  -->
+  <defs>
+    <linearGradient id="hl-bg" x1="3" y1="2" x2="29" y2="30" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#127A55"/>
+      <stop offset="100%" stop-color="#0D5E42"/>
+    </linearGradient>
+    <linearGradient id="hl-stream" x1="5" y1="24" x2="27" y2="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00D2FF" stop-opacity="0.25"/>
+      <stop offset="55%" stop-color="#00D2FF" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#7CF0FF" stop-opacity="0.45"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="1" y="1" width="30" height="30" rx="8" fill="url(#hl-bg)"/>
+  <circle cx="9" cy="8" r="6.5" fill="#ffffff" opacity="0.06"/>
+
+  <!-- Markov state ring -->
+  <circle cx="16" cy="14.2" r="6.4" fill="none" stroke="#F5F7FA" stroke-width="1.05" opacity="0.85"/>
+  <circle cx="16" cy="7.8" r="1.05" fill="#F5F7FA"/>
+  <circle cx="21.6" cy="16.6" r="1.05" fill="#F5F7FA" opacity="0.7"/>
+  <circle cx="10.4" cy="16.6" r="1.05" fill="#F5F7FA" opacity="0.7"/>
+
+  <!-- K-line band -->
+  <line x1="11.2" y1="11.2" x2="11.2" y2="18.4" stroke="#F5F7FA" stroke-width="0.7" opacity="0.55"/>
+  <rect x="10.2" y="13.4" width="2" height="3.6" rx="0.35" fill="#F5F7FA" opacity="0.45"/>
+  <line x1="15.2" y1="10" x2="15.2" y2="17.2" stroke="#00D2FF" stroke-width="0.75"/>
+  <rect x="14.2" y="11.6" width="2" height="3.8" rx="0.35" fill="#00D2FF"/>
+  <line x1="19.2" y1="9.2" x2="19.2" y2="16" stroke="#F1C40F" stroke-width="0.75"/>
+  <rect x="18.2" y="10.4" width="2" height="4.2" rx="0.35" fill="#F1C40F"/>
+
+  <path d="M5.5 26.2 C9 24.8, 12.5 27.1, 16 25.9 C19.2 24.8, 22.5 25.6, 26.5 24.9"
+        fill="none" stroke="url(#hl-stream)" stroke-width="1.45" stroke-linecap="round"/>
+
+  <g transform="translate(24.2 7.2)">
+    <path d="M0-2.1 L0.45-0.45 L2.1 0 L0.45 0.45 L0 2.1 L-0.45 0.45 L-2.1 0 L-0.45-0.45 Z" fill="#00D2FF"/>
+    <circle cx="0" cy="0" r="0.45" fill="#F5F7FA"/>
+  </g>
+</svg>

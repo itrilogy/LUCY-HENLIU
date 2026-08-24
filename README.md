@@ -1,7 +1,9 @@
-# QuantLab — 量化交易分析工具
+# 衡流 (HengLiu / QuantFlow) — 本地量化分析工具
 
-> 基于国投证券(行情) + 国信证券(财务)双数据源的本地量化分析平台。
-> 每只股票独立的模式发现引擎，通过预测→反馈→迭代收敛实现自适应学习。
+> **审度称衡，守正观流**  
+> 基于国投证券(行情) + 国信证券(财务)双数据源的本地量化分析平台。  
+> 每只股票独立的模式发现引擎，通过预测→反馈→迭代收敛实现自适应学习。  
+> 出品：**鹿溪联合创新实验室**（LUXI Joint Innovation Lab）
 
 ## 数据全景
 
@@ -51,43 +53,27 @@ streamlit run src/main.py
 
 ```
 src/
-├── main.py                    # Streamlit UI（含自选股管理/覆盖率展示/回测绩效）
+├── main.py                    # Streamlit 布局（主题/研报/组合拆到 src/ui、service）
 ├── scheduler.py               # 交易日 15:30 定时调度 + 结果告警（常驻）
-├── sync_daily.py              # 一键全量同步（单实例锁 + 完成后自动备份）
-├── sync_now.py                # 全量同步脚本（行情+K线）
-├── sync_trend.py              # 分时同步脚本
-├── sync_financial.py          # 财务同步脚本
-├── sync_extra.py              # 辅助数据（行业拥挤度/宏观/资金流向）
-├── sync_macro_public.py       # 公开宏观历史数据回填
-├── sync_research_history.py   # 历史研报回填
-├── datasource/
-│   ├── sdicsc_client.py       # 国投证券 API
-│   ├── gs_client.py           # 国信证券 API
-│   └── ratelimit.py           # 限流/重试/熔断统一封装（429 重试 + 日限额熔断）
-├── quant/
-│   ├── engine.py              # 量化分析引擎（GMM/马尔可夫/动量）
-│   ├── pattern_discovery.py   # 模式发现引擎（显著性二项检验 + 增强回测）
-│   └── prediction_loop.py     # 预测-反馈闭环（结算+新预测）
-├── analyst/
-│   └── research.py            # AI 研报引擎（宏观问答+标签分类）
-├── db/
-│   └── schema.py              # 数据库统一 DDL（24 张表）
-└── service/
-    ├── sync.py                # 同步调度服务（K线补全/间隙修复/财务补拉）
-    ├── logging_setup.py       # 统一日志（data/logs/，按天轮转）
-    ├── lock.py                # 跨进程单实例锁（fcntl）
-    ├── backup.py              # SQLite 自动备份（VACUUM INTO 每日快照）
-    ├── notify.py              # 多通道通知（日志 + 微信机器人）
-    └── coverage.py            # 数据覆盖率计算（data_coverage）
+├── sync_daily.py              # 一键全量（锁内 pipeline + 备份；部分失败退出码 2）
+├── sync_now.py / sync_trend.py / sync_financial.py / sync_extra.py
+├── datasource/                # 国投 + 国信 + 限流熔断（国信熔到次日 0 点）
+├── quant/                     # GMM / 模式发现 / 预测闭环（OOS vs 多数类）
+├── db/connection.py           # WAL + FK + busy_timeout
+├── db/migrations.py           # user_version 迁移（日历/指标字典）
+├── service/pipeline.py        # 同步门面（CLI 与 UI 共用）
+├── service/calendar.py        # 交易日历
+├── service/codes.py           # 市场推断 / API 代码映射
+└── ui/                        # theme / charts / research
 
-tests/                         # pytest 单元测试（36 个用例）
+tests/                         # pytest（connection/日历/同步门面/泄漏/OOS）
 ```
 
 ## 工程能力
 
 | 能力 | 说明 |
 |---|---|
-| 单元测试 | `python3 -m pytest tests/ -q`（需先 `pip install pytest`） |
+| 单元测试 | `python3 -m pytest tests/ -q`（pytest 已写入 requirements.txt） |
 | API 限流/熔断 | 国投 429 自动指数退避重试；国信日限额（197006）当日熔断不再发请求 |
 | 单实例锁 | 同步脚本并发执行时自动跳过，防止写坏 SQLite |
 | 自动备份 | 每次同步后 `VACUUM INTO` 快照到 `data/backups/`（保留 14 天） |
@@ -107,9 +93,9 @@ tests/                         # pytest 单元测试（36 个用例）
 生成预测 → 存入 prediction_log → 次日K线到达 → 结算(对比实际) → 收敛提升
 ```
 
-- **结算**：用最新收盘价回填到期预测的 `actual_*` 字段，统计命中率
-- **新预测**：基于最新状态生成下一交易日预测入库
-- 当前平均准确率约 33%，随数据积累逐步提升
+- **结算**：按预测目标日相对前一交易日收盘的涨跌回填 `actual_*`（节假日顺延到下一开市日）
+- **新预测**：基于最新状态生成下一交易日预测入库；模式方向为先验规则，不再用次日标签冒充命中率
+- **口径**：不要把三分类均匀 33% 当成能力。诚实零假设是多数类（A 股常为盘整）。UI「因子&信号」展示 `prediction_log` 命中率相对多数类基线。首轮实盘结算约 5/24（弱于随机），需积累后再评估
 
 ## 说明
 
@@ -121,7 +107,7 @@ tests/                         # pytest 单元测试（36 个用例）
 
 ## 📜 版权与数据声明
 
-**版权**：本仓库（QuantLab）由 **鹿溪联合创新实验室（Luxi Joint Innovation Laboratory）** 原创开发，
+**版权**：本仓库（衡流 · HengLiu / QuantFlow）由 **鹿溪联合创新实验室（LUXI Joint Innovation Lab）** 原创开发，
 采用 [MIT](./LICENSE) 许可证开源。引用、修改、分发时请保留版权与许可证声明。
 
 **数据来源**：

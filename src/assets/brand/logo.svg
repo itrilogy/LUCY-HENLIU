@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 56" role="img" aria-label="衡流 · HengLiu (QuantFlow)">
+  <defs>
+    <linearGradient id="hl-tile" x1="4" y1="4" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#127A55"/>
+      <stop offset="100%" stop-color="#0D5E42"/>
+    </linearGradient>
+    <linearGradient id="hl-lock-stream" x1="10" y1="40" x2="42" y2="42" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00D2FF" stop-opacity="0.3"/>
+      <stop offset="50%" stop-color="#00D2FF" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#7CF0FF" stop-opacity="0.5"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="2" y="4" width="48" height="48" rx="12" fill="url(#hl-tile)"/>
+  <circle cx="14" cy="14" r="10" fill="#fff" opacity="0.06"/>
+  <circle cx="26" cy="24" r="11" fill="none" stroke="#F5F7FA" stroke-width="1.6" opacity="0.9"/>
+  <circle cx="26" cy="13.2" r="1.6" fill="#F5F7FA"/>
+  <circle cx="35.4" cy="28.2" r="1.5" fill="#F5F7FA" opacity="0.7"/>
+  <circle cx="16.6" cy="28.2" r="1.5" fill="#F5F7FA" opacity="0.7"/>
+  <line x1="18.4" y1="19" x2="18.4" y2="31" stroke="#F5F7FA" stroke-width="1.1" opacity="0.55"/>
+  <rect x="16.8" y="22.2" width="3.2" height="6" rx="0.5" fill="#F5F7FA" opacity="0.45"/>
+  <line x1="25.2" y1="16.6" x2="25.2" y2="29" stroke="#00D2FF" stroke-width="1.2"/>
+  <rect x="23.6" y="19.2" width="3.2" height="6.4" rx="0.5" fill="#00D2FF"/>
+  <line x1="32" y1="15.4" x2="32" y2="27.6" stroke="#F1C40F" stroke-width="1.2"/>
+  <rect x="30.4" y="17.4" width="3.2" height="7" rx="0.5" fill="#F1C40F"/>
+  <path d="M10 45 C15.5 43, 20.5 46.5, 26 44.8 C31 43.4, 35.5 44.5, 42 43.5"
+        fill="none" stroke="url(#hl-lock-stream)" stroke-width="1.8" stroke-linecap="round"/>
+  <g transform="translate(40 14)">
+    <path d="M0-2.4 L0.55-0.55 L2.4 0 L0.55 0.55 L0 2.4 L-0.55 0.55 L-2.4 0 L-0.55-0.55 Z" fill="#00D2FF"/>
+    <circle cx="0" cy="0" r="0.5" fill="#F5F7FA"/>
+  </g>
+
+  <text x="64" y="27" fill="#0D5E42" font-family="system-ui,-apple-system,'PingFang SC','Segoe UI',sans-serif"
+        font-size="20" font-weight="800" letter-spacing="0.04em">衡流 · HengLiu</text>
+  <text x="64" y="46" fill="#64748B" font-family="system-ui,-apple-system,'PingFang SC','Segoe UI',sans-serif"
+        font-size="11">审度称衡，守正观流 · QuantFlow</text>
+</svg>
