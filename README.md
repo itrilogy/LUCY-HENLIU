@@ -1,9 +1,31 @@
-# 衡流 (HengLiu / QuantFlow) — 本地量化分析工具
+<div align="center">
+  <img src="src/assets/brand/favicon.svg" width="96" height="96" alt="衡流 · HengLiu" />
+</div>
 
-> **审度称衡，守正观流**  
-> 基于国投证券(行情) + 国信证券(财务)双数据源的本地量化分析平台。  
-> 每只股票独立的模式发现引擎，通过预测→反馈→迭代收敛实现自适应学习。  
-> 出品：**鹿溪联合创新实验室**（LUXI Joint Innovation Lab）
+<h1 align="center">衡流 · HengLiu（QuantFlow）</h1>
+
+<p align="center">
+  <strong>本地量化分析工具</strong><br/>
+  <em>审度称衡，守正观流</em>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Product-衡流%20HengLiu-0D5E42" alt="product" />
+  <img src="https://img.shields.io/badge/Lab-鹿溪联合创新实验室-047538" alt="lab" />
+  <img src="https://img.shields.io/badge/Based%20on-国投证券%20%7C%20国信证券-6366f1" alt="datasource" />
+  <img src="https://img.shields.io/badge/Stack-Python%20%7C%20Streamlit%20%7C%20sklearn-blue" alt="stack" />
+  <img src="https://img.shields.io/github/license/itrilogy/LUCY-HENLIU" alt="license" />
+</p>
+
+<p align="center">
+  <b>鹿溪联合创新实验室（LUXI Joint Innovation Lab）</b> 出品<br/>
+  仓库：<a href="https://github.com/itrilogy/LUCY-HENLIU">itrilogy/LUCY-HENLIU</a>
+</p>
+
+---
+
+基于国投证券(行情) + 国信证券(财务)双数据源的本地量化分析平台。
+每只股票独立的模式发现引擎，通过预测→反馈→迭代收敛实现自适应学习。
 
 ## 数据全景
 
@@ -20,19 +42,23 @@
 > 运行环境：直接使用系统 Python 3（本机已验证 Python 3.14 + sklearn 1.9 / pandas 3.0），**不创建 venv**。
 
 ```bash
-# 1. 安装依赖到系统 Python（含量化引擎所需 scikit-learn）
+# 1. 克隆并进入
+git clone https://github.com/itrilogy/LUCY-HENLIU.git
+cd LUCY-HENLIU
+
+# 2. 安装依赖到系统 Python（含量化引擎所需 scikit-learn）
 pip install -r requirements.txt
 
-# 2. 配置 API Key（首次运行任一步骤都会自动建表，无需手动初始化）
+# 3. 配置 API Key（首次运行任一步骤都会自动建表，无需手动初始化）
 cp config/.env.example config/.env   # 在网页获取 API Key
 
-# 3. 数据同步（首次先全量，之后每日用 sync_daily.py）
+# 4. 数据同步（首次先全量，之后每日用 sync_daily.py）
 python3 src/sync_now.py               # 全量同步 (行情+K线)
 python3 src/sync_trend.py             # 分时同步
 python3 src/sync_financial.py         # 财务同步
 python3 src/sync_daily.py             # 一键全量（含研报/选股/预测闭环）
 
-# 4. 启动 UI
+# 5. 启动 UI
 streamlit run src/main.py
 ```
 
