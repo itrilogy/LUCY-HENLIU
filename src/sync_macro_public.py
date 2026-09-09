@@ -75,9 +75,12 @@ def store_data(db: sqlite3.Connection):
     for tag, name, data, unit in datasets:
         for year, val in data:
             # 写入 macro_indicator
+            code_map = {"GDP": "GDP_CN", "CPI": "CPI_CN", "PPI": "PPI_CN",
+                        "PMI": "PMI_CN", "货币": "M2_CN"}
+            ind_code = code_map.get(tag.split("·")[1], f"{tag.split('·')[1]}_CN")
             db.execute(
-                "INSERT OR REPLACE INTO macro_indicator(indicator_code,period,value,unit,fetched_at) VALUES(?,?,?,?,datetime('now'))",
-                (f"{tag.split('·')[1]}_{year}", str(year), val, unit))
+                "INSERT OR REPLACE INTO macro_indicator(indicator_code,period,value,unit,fetched_at) VALUES(?,?,?,?,datetime('now','localtime'))",
+                (ind_code, str(year), val, unit))
             
             # 写入 research_article
             content = f"""## {name} {year}年
@@ -112,30 +115,30 @@ def sync_from_eastmoney(db):
 
 def main():
     log_file = Path(__file__).parent.parent / "data" / "sync_macro.log"
-    
+
     def log(msg):
         ts = datetime.now().strftime("%H:%M:%S")
         line = f"[{ts}] {msg}"
         print(line, flush=True)
-        with open(log_file, "a") as f: f.write(line + "\n")
-    
+        with open(log_file, "a") as f:
+            f.write(line + "\n")
+
     log("=" * 50)
     log("📊 宏观经济历史数据回填（公开数据源）")
-    
-    from src.db.schema import init_db
-    init_db(str(DB))
-    db = sqlite3.connect(str(DB))
-    
-    # 存储历史数据
-    cnt = store_data(db)
-    log(f"✅ 已写入 {cnt} 条历史数据")
-    
-    # 各类统计
-    for prefix, label in [("GDP", "GDP"), ("CPI", "CPI"), ("PPI", "PPI"), ("PMI", "PMI"), ("货币", "M2")]:
-        rows = db.execute(f"SELECT COUNT(*) FROM research_article WHERE category LIKE '%{prefix}%'").fetchone()[0]
-        log(f"  {label}: {rows} 条")
-    
-    db.close()
+
+    from src.db.connection import open_db
+    from src.service.lock import single_instance
+    with single_instance("数据同步"):
+        db = open_db()
+        cnt = store_data(db)
+        log(f"✅ 已写入 {cnt} 条历史数据")
+        for prefix, label in [("GDP", "GDP"), ("CPI", "CPI"), ("PPI", "PPI"),
+                              ("PMI", "PMI"), ("货币", "M2")]:
+            rows = db.execute(
+                "SELECT COUNT(*) FROM research_article WHERE category LIKE ?",
+                (f"%{prefix}%",)).fetchone()[0]
+            log(f"  {label}: {rows} 条")
+        db.close()
     log("=" * 50)
 
 

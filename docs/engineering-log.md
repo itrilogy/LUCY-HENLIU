@@ -100,33 +100,64 @@ QuantLab 是个人量化分析平台：双数据源（国投证券行情 / 国�
 ## 七、已知限制与后续方向
 
 ### 已知限制
-1. **国信日限额**：GS_API_KEY 每日限额（197006）耗尽后所有端点静默返回 0 条，次日 0 点重置——同步脚本已熔断不再空转，但财务增量需限额窗口内分日完成
-2. **交易日历**：`scheduler.is_trading_day` 仅判断周一~周五，未覆盖 A 股法定节假日（`trade_calendar` 表 0 行，可用其扩展精确日历）
-3. **节假日预测**：`_next_trade_date` 只跳周末；预测目标日落在节假日时由结算顺延逻辑兜底（已实现）
-4. **微信通知格式**：ilinkai 网关 API 未公开文档，`notify._weixin` 为 best-effort（POST JSON `{token, title, content}`），失败仅记日志
-5. **`sync_daily --quick` 财务骨架行**：只建行不填值，数值由 `sync_financial.py`（UPSERT）覆盖
-6. **回测夏普未减无风险利率**（当前 rf=0，可配置）
+1. **国信日限额**：197006 触发后 `gs` 熔断至**次日 0 点**；所有国信请求走 `gs_client`（含宏观/选股/资金流）
+2. **交易日历**：`trade_calendar` 由迁移播种（周末+近年法定假）；补班周六未单独打开
+3. **微信通知格式**：ilinkai 网关 API 未公开文档，`notify._weixin` 为 best-effort
+4. **回测夏普未减无风险利率**（当前 rf=0）
+5. **GMM「当前状态」**仍是全样本描述性聚类，UI 已标注，不可当作交易信号
+6. **首轮 OOS**：prediction_log 5/24（20.8%），弱于多数类基线；需继续积累
 
-### 后续方向（未实施，按优先级）
-1. **交易日精确日历**：`trade_calendar` 填充 + `_next_trade_date` 接入
-2. **回测交易成本可配置**：滑点/印花税/资金管理等
-3. **组合层风控**：相关性热图（`correlation_matrix` 已实现未展示）、组合波动率
-4. **数据源扩展**：数据源抽象为协议层，接入 Tushare 等备用源（缓解单一数据源限额/断供）
-5. **报告导出**：周报/月报 PDF
-6. **launchd 开机自启**：scheduler 常驻化（用户当前暂不需要）
+### 后续方向（未实施）
+1. 回测滑点/印花税/资金管理可配置
+2. 组合层风控热图接入 UI
+3. 数据源 Protocol + Tushare 备用
+4. 报告导出 PDF
+5. launchd 开机自启
+
+---
+
+## 十二、四周工程落地（2026-08-13）
+
+对照第二轮评估执行：
+
+**W1 正确性**
+- 模式发现去掉标签泄漏（锤子/吞没/动量用先验方向）
+- 财务改为单票事务 + `ON CONFLICT DO UPDATE`（不再 REPLACE 挖空）
+- 国信熔断到次日 0 点；`sync_extra`/`smart_picks` 不再裸 urllib
+- 所有写库脚本 + UI 🔄 共用 `sync.lock`；备份在锁内
+- README 去掉「准确率约 33% / 收敛提升」口径
+
+**W2 同步收敛**
+- `src/db/connection.py` + `migrations.py`（WAL/FK/busy_timeout/`user_version`）
+- `src/service/pipeline.py` 统一行情/K线/分时/财务/宏观/拥挤度/资金流/预测
+- CLI 瘦身为门面包装；`service/sync.py` 降为兼容层
+- K 线 UPSERT；行情 `trade_date` 用 payload；快照每票保留 5 条
+- `trade_calendar` 播种；`_next_trade_date` / 调度读日历规则
+- `sync_log` 记录 success/partial/failed；部分失败退出码 2
+
+**W3 预测诚实**
+- walk-forward 聚合 + 不显著模式丢弃 + 经验 `p0`
+- 无信号返回 flat（不再默认 up）
+- UI 展示 OOS vs 多数类基线
+- `generate_predictions` 持久化模式并写入 `pattern_type`
+
+**W4 UI / 架构**
+- `src/ui/{theme,charts,research}.py` + `config/seed.json` + `.streamlit/config.toml`
+- `src/service/{codes,calendar,portfolio}.py`
+- pytest/Pillow 写入 requirements；`.env.example` 补 DeepSeek/微信
 
 ---
 
 ## 八、运行手册（速查）
 
 ```bash
-python3 -m pytest tests/ -q              # 测试（39 用例）
+python3 -m pytest tests/ -q              # 测试
 python3 src/sync_daily.py --full         # 手动全量同步（锁→同步→备份）
-python3 src/scheduler.py                 # 常驻：工作日 15:30 自动同步 + 微信告警
+python3 src/scheduler.py                 # 常驻：交易日 15:30 自动同步 + 微信告警
 streamlit run src/main.py                # UI
 ```
 
-依赖（系统 Python 3，不建 venv）：`pip install --break-system-packages -r requirements.txt pytest`
+依赖（系统 Python 3，不建 venv）：`pip install --break-system-packages -r requirements.txt`
 
 ---
 

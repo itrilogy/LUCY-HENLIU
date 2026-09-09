@@ -47,3 +47,10 @@ def test_single_instance_lock_works(tmp_path, monkeypatch):
     monkeypatch.setattr(lk, "LOCK_FILE", tmp_path / "lock")
     with single_instance("测试"):
         assert lk.LOCK_FILE.exists()
+
+
+def test_try_single_instance_yields_true(tmp_path, monkeypatch):
+    import src.service.lock as lk
+    monkeypatch.setattr(lk, "LOCK_FILE", tmp_path / "lock")
+    with lk.try_single_instance("测试") as ok:
+        assert ok is True

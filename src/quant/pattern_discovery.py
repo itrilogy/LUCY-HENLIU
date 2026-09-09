@@ -85,7 +85,7 @@ class PatternDiscoveryEngine:
         """加载K线数据并计算衍生特征"""
         if kline_df.empty or len(kline_df) < 30:
             return False
-        self.df = kline_df.sort_values("trade_date").copy()
+        self.df = kline_df.sort_values("trade_date").reset_index(drop=True).copy()
         self._compute_features()
         self._loaded = True
         # 尝试从数据库加载已有模式
@@ -177,7 +177,10 @@ class PatternDiscoveryEngine:
             try:
                 found = method()
                 count += found
-            except Exception:
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "discover %s failed: %s", method.__name__, e)
                 continue
         
         # 保存到数据库
@@ -195,17 +198,17 @@ class PatternDiscoveryEngine:
             curr = df.iloc[i]
             direction = df.iloc[i]["next_direction"]
             
-            # 锤子线: 下影线>实体2倍, 上影线短
+            # 锤子线: 下影线>实体2倍, 上影线短 → 先验看涨（不用次日标签当方向）
             body = abs(curr["close"] - curr["open"])
             lower_shadow = min(curr["open"], curr["close"]) - curr["low"]
             upper_shadow = curr["high"] - max(curr["open"], curr["close"])
             if (body > 0 and lower_shadow > body * 2 and upper_shadow < body * 0.3
                 and prev["close"] > curr["close"]):
                 sig = f"hammer_{i}"
-                self._add_pattern("candlestick", sig, "up" if direction == "up" else "flat", i)
+                self._add_pattern("candlestick", sig, "up", i)
                 found += 1
             
-            # 吞没形态
+            # 看涨吞没：先验方向 up，命中率用次日真实涨跌衡量
             prev_body = abs(prev["close"] - prev["open"])
             curr_body = abs(curr["close"] - curr["open"])
             if (body > 0 and prev_body > 0 and curr_body > prev_body * 1.2):
@@ -213,13 +216,13 @@ class PatternDiscoveryEngine:
                 curr_bull = curr["close"] > curr["open"]   # 后阳
                 if prev_bear and curr_bull and curr["open"] < prev["close"] and curr["close"] > prev["open"]:
                     sig = f"engulfing_bull_{i}"
-                    self._add_pattern("candlestick", sig, direction, i)
+                    self._add_pattern("candlestick", sig, "up", i)
                     found += 1
             
-            # 十字星: 实体极小
-            if body > 0 and body / (df.iloc[i]["high"] - df.iloc[i]["low"]) < 0.1:
+            # 十字星: 实体极小；high==low 时跳过避免除零
+            rng = float(df.iloc[i]["high"] - df.iloc[i]["low"])
+            if body > 0 and rng > 0 and body / rng < 0.1:
                 sig = f"doji_{i}"
-                # 十字星后通常反转
                 pred_dir = "up" if prev["close"] < curr["close"] else "down"
                 self._add_pattern("candlestick", sig, pred_dir, i)
                 found += 1
@@ -323,15 +326,15 @@ class PatternDiscoveryEngine:
         for i in range(3, len(df) - 1):
             if pd.isna(df.iloc[i]["next_direction"]):
                 continue
-            # 连涨3天 → 第4天?
-            if all(df.iloc[i-j]["return"] > 0 for j in range(3) if not pd.isna(df.iloc[i-j]["return"])):
+            # 连涨3天 → 先验动量延续（不用次日标签）
+            rets = [df.iloc[i - j]["return"] for j in range(3)]
+            if all(pd.notna(x) and x > 0 for x in rets):
                 sig = f"consecutive_up_{i}"
-                self._add_pattern("momentum", sig, df.iloc[i]["next_direction"], i)
+                self._add_pattern("momentum", sig, "up", i)
                 found += 1
-            # 连跌3天
-            if all(df.iloc[i-j]["return"] < 0 for j in range(3) if not pd.isna(df.iloc[i-j]["return"])):
+            if all(pd.notna(x) and x < 0 for x in rets):
                 sig = f"consecutive_down_{i}"
-                self._add_pattern("momentum", sig, df.iloc[i]["next_direction"], i)
+                self._add_pattern("momentum", sig, "down", i)
                 found += 1
         return found
     
@@ -348,14 +351,16 @@ class PatternDiscoveryEngine:
     
     # ── 模式库管理 ──
     
-    def _aggregate_patterns(self) -> dict:
-        """聚合相同模式，计算命中率"""
+    def _aggregate_patterns(self, cutoff_idx: int | None = None) -> dict:
+        """聚合相同模式，计算命中率。cutoff_idx 之前的样本才计入（walk-forward）。"""
         from collections import defaultdict
         agg = defaultdict(lambda: {"hits": 0, "total": 0, "directions": defaultdict(int)})
         for ptype, matches in self.patterns.items():
             for m in matches:
                 # 跳过DB加载的摘要模式(已聚合)
                 if m.get("from_db"):
+                    continue
+                if cutoff_idx is not None and m.get("idx") is not None and m["idx"] >= cutoff_idx:
                     continue
                 # 用模式类型+方向作为聚合键
                 key = f"{ptype}_{m['direction']}"
@@ -364,6 +369,16 @@ class PatternDiscoveryEngine:
                     agg[key]["hits"] += 1
                 agg[key]["directions"][m["actual_dir"]] += 1
         return dict(agg)
+
+    def _empirical_p0(self, direction: str) -> float:
+        """训练窗内该方向的经验频率，作二项检验零假设。"""
+        if self.df is None or "next_direction" not in self.df.columns:
+            return 1 / 3 if direction == "flat" else 0.5
+        s = self.df["next_direction"].dropna()
+        if s.empty:
+            return 1 / 3 if direction == "flat" else 0.5
+        p = float((s == direction).mean())
+        return min(0.9, max(0.05, p))
     
     def _load_patterns_from_db(self):
         """从数据库加载历史模式"""
@@ -502,20 +517,19 @@ class PatternDiscoveryEngine:
             elif vr > 1.5 and ret < -th: direction_scores["down"] += 0.20; patterns_found.append("放量下跌")
             elif vr < 0.5 and abs(ret) < th*0.5: direction_scores["flat"] += 0.15; patterns_found.append("缩量盘整")
         
-        # 5. 历史模式集成（带衰减权重 + 显著性筛选）
-        agg = self._aggregate_patterns()
-        pattern_votes = {"up": 0, "down": 0, "flat": 0}
+        # 5. 历史模式集成（walk-forward：不含当前 bar；不显著直接丢弃）
+        origin = len(df) - 1
+        agg = self._aggregate_patterns(cutoff_idx=origin)
+        pattern_votes = {"up": 0.0, "down": 0.0, "flat": 0.0}
         for key, stats in agg.items():
-            if stats["total"] < 3: continue
+            if stats["total"] < 3:
+                continue
             hit_rate = stats["hits"] / stats["total"]
-            # 衰减系数：样本越多越可信，但不超过0.6权重
-            weight = min(0.6, hit_rate * min(1.0, stats["total"] / 10))
-            # 统计不显著的模式（样本不足或胜率不显著高于随机基准）权重减半
-            # flat 模式的随机基准为 1/3（三分类），up/down 为 0.5
-            dir_key = key.split("_")[-1]
-            p0 = 1 / 3 if dir_key == "flat" else 0.5
+            dir_key = key.rsplit("_", 1)[-1]
+            p0 = self._empirical_p0(dir_key)
             if not self._is_significant(stats["hits"], stats["total"], p0=p0):
-                weight *= 0.5
+                continue
+            weight = min(0.6, hit_rate * min(1.0, stats["total"] / 10))
             if dir_key in pattern_votes:
                 pattern_votes[dir_key] += weight
         
@@ -533,10 +547,17 @@ class PatternDiscoveryEngine:
             if vol < vol5 * 0.7: direction_scores["flat"] += 0.15; patterns_found.append("波动收缩")
             elif vol > vol5 * 1.5: direction_scores["flat"] -= 0.10  # 波动扩张→方向性突破
         
-        # 决策
-        total_score = sum(direction_scores.values())
-        if total_score > 0:
-            for k in direction_scores: direction_scores[k] /= total_score
+        # 决策：无有效信号不默认 up
+        total_score = sum(max(0.0, v) for v in direction_scores.values())
+        if total_score <= 0:
+            return Prediction(
+                stock_code=self.stock_code,
+                trade_date=self._next_trade_date(df.iloc[-1]["trade_date"]),
+                direction="flat", confidence=0.2,
+                predicted_price=round(float(current_state["close"]), 2),
+                engine_version=self.version, patterns_used=["无有效信号"])
+        for k in direction_scores:
+            direction_scores[k] = max(0.0, direction_scores[k]) / total_score
         
         best_dir = max(direction_scores, key=direction_scores.get)
         confidence = direction_scores[best_dir]
@@ -558,23 +579,35 @@ class PatternDiscoveryEngine:
         )
     
     def _next_trade_date(self, last_date) -> str:
-        """估算下一交易日"""
+        """估算下一交易日（优先 trade_calendar）。"""
+        conn = None
         try:
-            d = datetime.strptime(str(last_date), "%Y-%m-%d") + timedelta(days=1)
-            while d.weekday() >= 5:
-                d += timedelta(days=1)
-            return d.strftime("%Y-%m-%d")
-        except:
-            return datetime.now().strftime("%Y-%m-%d")
+            from src.service.calendar import next_open_date
+            if self.db_path:
+                conn = sqlite3.connect(self.db_path)
+            return next_open_date(str(last_date)[:10], db=conn)
+        except Exception:
+            try:
+                d = datetime.strptime(str(last_date)[:10], "%Y-%m-%d") + timedelta(days=1)
+                while d.weekday() >= 5:
+                    d += timedelta(days=1)
+                return d.strftime("%Y-%m-%d")
+            except Exception:
+                return datetime.now().strftime("%Y-%m-%d")
+        finally:
+            if conn is not None:
+                conn.close()
     
     # ── 反馈与迭代 ──
     
-    def feedback(self, prediction: Prediction, actual_close: float):
+    def feedback(self, prediction: Prediction, actual_close: float,
+                 prev_close: float | None = None):
         """
-        反馈: 将预测与实际对比，计算偏差
-        返回偏差统计
+        反馈: 与结算口径一致——相对前一交易日收盘（不是相对预测价）。
         """
-        actual_return = (actual_close - prediction.predicted_price) / prediction.predicted_price * 100
+        base = prev_close if prev_close and prev_close > 0 else (
+            prediction.predicted_price if prediction.predicted_price else actual_close)
+        actual_return = (actual_close - base) / base * 100 if base else 0.0
         if actual_return > 1:
             actual_dir = "up"
         elif actual_return < -1:

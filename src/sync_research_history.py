@@ -71,10 +71,15 @@ THEMATIC_QUERIES = [
 def main():
     log("=" * 60)
     log("📚 历史研报全量回填开始")
-    
-    from src.db.schema import init_db
-    init_db(str(DB))
-    db = sqlite3.connect(str(DB))
+
+    from src.db.connection import open_db
+    from src.service.lock import single_instance
+    with single_instance("数据同步"):
+        _run()
+
+
+def _run():
+    db = open_db(str(DB))
     total_ok = 0
     
     # ── 1. 按年查询（5个指标 × 12年 = 60条） ──

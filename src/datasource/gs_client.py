@@ -136,6 +136,27 @@ def query_fund_flow(code: str, set_code: int = 0, period: int = 10) -> dict:
                        "period": str(period)})
 
 
+def query_macro(text: str) -> dict:
+    """宏观/研报问答 adapter。"""
+    url = f"{BASE_URL}/agent/adapter/query"
+    return _get(url, {"text": text})
+
+
+def query_smart_picks(searchstring: str) -> dict:
+    """智能选股。"""
+    url = f"{BASE_URL}/agent/mcp/smart_stock_picking"
+    return _get(url, {"searchstring": searchstring, "searchtype": "stock"})
+
+
+def is_gs_error(raw) -> bool:
+    if not isinstance(raw, dict):
+        return False
+    result = raw.get("result")
+    if isinstance(result, list) and result:
+        return result[0].get("code") in (GS_QUOTA_CODE, -1)
+    return False
+
+
 # ── 财务字段提取工具 ────────────────────────────
 
 def extract_financial_data(raw: dict) -> dict:

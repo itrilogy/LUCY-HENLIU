@@ -62,6 +62,20 @@ def test_breaker_auto_opens_on_quota_error():
     BREAKERS["gs"].close()
 
 
+def test_gs_breaker_opens_until_midnight():
+    import time
+    from datetime import datetime, timedelta
+    BREAKERS["gs"].close()
+    BREAKERS["gs"].open("日限额")
+    assert BREAKERS["gs"].is_open
+    tomorrow = (datetime.now() + timedelta(days=1)).replace(
+        hour=0, minute=0, second=0, microsecond=0)
+    # 打开后的截止应在次日 0 点附近（允许 2 秒误差）
+    assert abs(BREAKERS["gs"]._opened_until - tomorrow.timestamp()) < 2
+    assert BREAKERS["gs"]._opened_until > time.time() + 60
+    BREAKERS["gs"].close()
+
+
 def test_global_breakers_isolated():
     # gs 熔断不影响 sdicsc
     BREAKERS["gs"].open("测试")

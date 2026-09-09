@@ -93,3 +93,58 @@ def test_pattern_significance_flat_baseline():
     r50 = pde._is_significant(16, 30, p0=0.5)
     r33 = pde._is_significant(16, 30, p0=1 / 3)
     assert r33 and not r50
+
+
+def _engulfing_pair(prev_o, prev_c, curr_o, curr_c):
+    return prev_o, prev_c, curr_o, curr_c
+
+
+def test_engulfing_hit_rate_not_always_one():
+    """看涨吞没先验为 up，次日有涨有跌时命中率不得为 100%。"""
+    n = 80
+    close = np.full(n, 10.0)
+    open_ = np.full(n, 10.0)
+    high = np.full(n, 10.2)
+    low = np.full(n, 9.8)
+    # 在 i=30 和 i=50 各放一根看涨吞没
+    # 前阴: open=10.5 close=9.5；后阳: open=9.4 close=10.6
+    for i in (30, 50):
+        open_[i - 1], close[i - 1] = 10.5, 9.5
+        low[i - 1], high[i - 1] = 9.4, 10.6
+        open_[i], close[i] = 9.3, 10.8
+        low[i], high[i] = 9.2, 10.9
+    # 次日：30 之后下跌，50 之后上涨
+    close[31] = 9.0
+    open_[31] = 10.6
+    close[51] = 12.0
+    open_[51] = 10.6
+    dates = pd.bdate_range("2026-01-01", periods=n).strftime("%Y-%m-%d")
+    kdf = pd.DataFrame({
+        "trade_date": dates, "open": open_, "high": high, "low": low,
+        "close": close, "volume": np.full(n, 100000), "amount": np.full(n, 1e6),
+    })
+    pde = PatternDiscoveryEngine("000037")
+    pde.fit(kdf)
+    pde.discover_patterns()
+    agg = pde._aggregate_patterns()
+    key = "candlestick_up"
+    assert key in agg, agg.keys()
+    assert agg[key]["total"] >= 2
+    assert agg[key]["hits"] < agg[key]["total"]
+
+
+def test_no_signal_does_not_default_up():
+    n = 80
+    close = np.full(n, 10.0)
+    kdf = pd.DataFrame({
+        "trade_date": pd.bdate_range("2026-01-01", periods=n).strftime("%Y-%m-%d"),
+        "open": close, "high": close, "low": close,
+        "close": close, "volume": np.full(n, 100000), "amount": np.full(n, 1e6),
+    })
+    pde = PatternDiscoveryEngine("000037")
+    pde.fit(kdf)
+    pred = pde.predict()
+    assert pred is not None
+    assert pred.direction == "flat"
+    assert pred.confidence <= 0.35
+    assert "无有效信号" in pred.patterns_used

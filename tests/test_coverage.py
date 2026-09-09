@@ -45,7 +45,7 @@ def test_compute_coverage_persist_false_is_readonly(tmp_path):
 
 def test_guess_market_bond_segments():
     """可转债/可交换债市场细分：沪 110/113/118/132/120，深 123/128"""
-    from src.main import guess_market
+    from src.service.codes import guess_market
     assert guess_market("110059") == "SH"   # 沪市可转债
     assert guess_market("113050") == "SH"
     assert guess_market("120002") == "SH"   # 沪市可交换债

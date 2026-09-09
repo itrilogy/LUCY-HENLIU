@@ -1,0 +1,31 @@
+{
+  "portfolio_name": "组合",
+  "stocks": [
+    {"code": "301707", "name": "展芯股份", "market": "SZ", "holding": false},
+    {"code": "688825", "name": "C长鑫科技", "market": "SH", "holding": false},
+    {"code": "002916", "name": "深南电路", "market": "SZ", "holding": false},
+    {"code": "000037", "name": "深南电A", "market": "SZ", "holding": false},
+    {"code": "H02380", "name": "中国电力", "market": "HK", "holding": false},
+    {"code": "600875", "name": "东方电气", "market": "SH", "holding": true},
+    {"code": "300122", "name": "智飞生物", "market": "SZ", "holding": false},
+    {"code": "601229", "name": "上海银行", "market": "SH", "holding": false},
+    {"code": "600309", "name": "万华化学", "market": "SH", "holding": true},
+    {"code": "605060", "name": "联德股份", "market": "SH", "holding": false},
+    {"code": "603507", "name": "振江股份", "market": "SH", "holding": false},
+    {"code": "605123", "name": "派克新材", "market": "SH", "holding": false},
+    {"code": "688239", "name": "贵州航宇科技", "market": "SH", "holding": false},
+    {"code": "000534", "name": "万泽股份", "market": "SZ", "holding": false},
+    {"code": "603308", "name": "应流股份", "market": "SH", "holding": true},
+    {"code": "300829", "name": "金丹科技", "market": "SZ", "holding": false},
+    {"code": "600143", "name": "金发科技", "market": "SH", "holding": true},
+    {"code": "301501", "name": "恒鑫生活", "market": "SZ", "holding": false},
+    {"code": "002831", "name": "裕同科技", "market": "SZ", "holding": true},
+    {"code": "002228", "name": "合兴包装", "market": "SZ", "holding": false},
+    {"code": "601998", "name": "中信银行", "market": "SH", "holding": false},
+    {"code": "159611", "name": "电力ETF广发", "market": "SZ", "holding": false},
+    {"code": "600900", "name": "长江电力", "market": "SH", "holding": true},
+    {"code": "300034", "name": "钢研高纳", "market": "SZ", "holding": false},
+    {"code": "600399", "name": "抚顺特钢", "market": "SH", "holding": false},
+    {"code": "601727", "name": "上海电气", "market": "SH", "holding": false}
+  ]
+}

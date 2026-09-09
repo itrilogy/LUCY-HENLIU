@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.datasource.sdicsc_client import quote_to_db_row
+from src.datasource.sdicsc_client import quote_to_db_row, _normalize_code
 
 
 def test_quote_to_db_row_maps_fields():
@@ -42,6 +42,16 @@ def test_quote_to_db_row_maps_fields():
     assert row["market_value"] == "105.2"
     assert row["change_20d"] == "3.1"
     assert row["trade_date"]  # 非空（fetched_at 由 SQL 侧 datetime('now') 生成，不在映射中）
+
+
+def test_normalize_code_adds_prefix():
+    assert _normalize_code("600519") == "sh600519"
+    assert _normalize_code("000037") == "sz000037"
+
+
+def test_quote_to_db_row_prefers_payload_date():
+    row = quote_to_db_row({"date": "2026-08-11", "price": 1}, "000037")
+    assert row["trade_date"] == "2026-08-11"
 
 
 def test_quote_to_db_row_handles_missing_keys():

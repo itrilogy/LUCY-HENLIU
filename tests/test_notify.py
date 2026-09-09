@@ -10,11 +10,20 @@ from src.scheduler import is_trading_day
 
 def test_notify_log_channel_writes_log(tmp_path, monkeypatch):
     import src.service.notify as nt
-    monkeypatch.setattr(nt, "logger", logging.getLogger("notify.test"))
+    logger = logging.getLogger("notify.test.write")
+    logger.handlers.clear()
+    log_path = tmp_path / "n.log"
+    fh = logging.FileHandler(log_path, encoding="utf-8")
+    logger.addHandler(fh)
+    logger.setLevel(logging.INFO)
+    monkeypatch.setattr(nt, "logger", logger)
 
     with patch("src.service.notify._weixin") as mock_wx:
         notify("标题", "内容", channels=("log",))
-    mock_wx.assert_not_called()  # 未请求 weixin 通道
+    mock_wx.assert_not_called()
+    fh.flush()
+    text = log_path.read_text(encoding="utf-8")
+    assert "标题" in text and "内容" in text
 
 
 def test_weixin_skips_without_token(monkeypatch):

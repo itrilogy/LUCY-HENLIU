@@ -14,6 +14,7 @@
 import logging
 import random
 import time
+from datetime import datetime, timedelta
 from typing import Callable, TypeVar
 
 logger = logging.getLogger(__name__)
@@ -37,17 +38,26 @@ class QuotaExceededError(APIError):
 
 
 class CircuitBreaker:
-    """按供应商维度的熔断器：配额耗尽后冷却期内不再发请求"""
+    """按供应商维度的熔断器：配额耗尽后冷却期内不再发请求。"""
 
-    def __init__(self, cooldown: float = 3600.0):
+    def __init__(self, cooldown: float = 3600.0, until_midnight: bool = False):
         self.cooldown = cooldown
+        self.until_midnight = until_midnight
         self._opened_until = 0.0
         self._reason = ""
 
     def open(self, reason: str) -> None:
-        self._opened_until = time.time() + self.cooldown
+        if self.until_midnight:
+            now = datetime.now()
+            nxt = (now + timedelta(days=1)).replace(
+                hour=0, minute=0, second=0, microsecond=0)
+            self._opened_until = nxt.timestamp()
+            wait = max(1, int(self._opened_until - time.time()))
+        else:
+            self._opened_until = time.time() + self.cooldown
+            wait = int(self.cooldown)
         self._reason = reason
-        logger.warning("🔌 熔断器打开（%s），%d 秒内不再请求该数据源", reason, self.cooldown)
+        logger.warning("🔌 熔断器打开（%s），%d 秒内不再请求该数据源", reason, wait)
 
     def close(self) -> None:
         self._opened_until = 0.0
@@ -64,7 +74,7 @@ class CircuitBreaker:
 
 # 全局熔断器：gs（国信）/ sdicsc（国投）各自独立，互不影响
 BREAKERS: dict[str, CircuitBreaker] = {
-    "gs": CircuitBreaker(),
+    "gs": CircuitBreaker(until_midnight=True),  # 国信日限额：熔到次日 0 点
     "sdicsc": CircuitBreaker(),
 }
 

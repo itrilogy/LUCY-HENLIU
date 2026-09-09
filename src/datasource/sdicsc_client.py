@@ -41,13 +41,15 @@ def _headers() -> dict:
 
 def _normalize_code(code: str) -> str:
     """统一代码格式：600519 → sh600519"""
-    # 如果已有前缀，直接返回
-    if any(code.startswith(p) for p in ["sh", "sz", "bj", "hk", "SH", "SZ", "BJ", "HK"]):
-        return code.lower()
-    # H 股
-    if code.startswith("H") or code.startswith("h"):
-        return f"hk{code.lstrip('Hh')}"
-    return code
+    try:
+        from src.service.codes import to_api_code
+        return to_api_code(code)
+    except ImportError:
+        if any(code.startswith(p) for p in ["sh", "sz", "bj", "hk", "SH", "SZ", "BJ", "HK"]):
+            return code.lower()
+        if code.startswith("H") or code.startswith("h"):
+            return f"hk{code.lstrip('Hh')}"
+        return code
 
 
 # ── 行情 API ────────────────────────────────────
@@ -169,9 +171,42 @@ def quote_to_db_row(raw: dict, db_code: str) -> dict:
         "change_month": str(raw.get("changeThisMonth", "")),
         "change_week": str(raw.get("changeThisWeek", "")),
         "susp_flag": str(raw.get("suspFlag", "")),
-        "trade_date": datetime.now().strftime("%Y-%m-%d"),
-        "trade_time": datetime.now().strftime("%H:%M:%S"),
+        "trade_date": _as_trade_date(raw),
+        "trade_time": _as_trade_time(raw),
     }
+
+
+def _as_trade_date(raw: dict) -> str:
+    for k in ("date", "tradeDate", "trade_date", "time"):
+        v = raw.get(k)
+        if v:
+            s = str(v).replace("/", "-")
+            if len(s) >= 10:
+                return s[:10]
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def _as_trade_time(raw: dict) -> str:
+    for k in ("tradeTime", "trade_time", "time"):
+        v = raw.get(k)
+        if v:
+            s = str(v)
+            if len(s) >= 19:
+                return s[11:19]
+            if ":" in s and len(s) >= 8:
+                return s[:8]
+    return datetime.now().strftime("%H:%M:%S")
+
+
+def query_crowding(code: str) -> dict:
+    """行业拥挤度 GET /skill/api/v1/calc/query?code=... 返回该行业对象。"""
+    url = f"https://skills.sdicsc.com.cn/skill/api/v1/calc/query"
+    data = _request_json("GET", url, headers=_headers(),
+                         params={"code": code}, timeout=10)
+    blob = data.get("data") or {}
+    if isinstance(blob, dict):
+        return blob.get(code) or blob
+    return {}
 
 
 # ── 健康检查 ────────────────────────────────────

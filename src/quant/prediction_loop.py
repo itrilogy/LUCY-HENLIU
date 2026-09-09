@@ -70,19 +70,24 @@ def settle_predictions(db: sqlite3.Connection, code: str) -> int:
     return n
 
 
+def _db_path(db: sqlite3.Connection) -> str:
+    row = db.execute("PRAGMA database_list").fetchone()
+    return row[2] if row else ""
+
+
 def generate_predictions(db: sqlite3.Connection, code: str) -> bool:
-    """基于最新K线生成下一交易日预测并入库（防重复：同日同向预测不重复插入）。"""
+    """基于最新K线生成下一交易日预测并入库（防重复）。模式写入 pattern_library。"""
     kdf = _load_kline(db, code)
     if len(kdf) < 50:
         return False
-    pde = PatternDiscoveryEngine(code)  # 不传 db_path：预测过程不持久化模式
+    pde = PatternDiscoveryEngine(code, db_path=_db_path(db))
     if not pde.fit(kdf):
         return False
     pde.discover_patterns()
     pred = pde.predict()
     if pred is None:
         return False
-    # 防重：同一股票同一目标日的 pending 预测已存在则更新而非新增
+    used = ",".join(pred.patterns_used[:4]) if pred.patterns_used else None
     exists = db.execute(
         """SELECT id FROM prediction_log
            WHERE stock_code=? AND trade_date=? AND actual_price IS NULL""",
@@ -90,21 +95,51 @@ def generate_predictions(db: sqlite3.Connection, code: str) -> bool:
     if exists:
         db.execute(
             """UPDATE prediction_log
-               SET direction=?, confidence=?, predicted_price=?, engine_version=?
+               SET direction=?, confidence=?, predicted_price=?,
+                   engine_version=?, pattern_type=?
                WHERE id=?""",
             (pred.direction, pred.confidence, pred.predicted_price,
-             pred.engine_version, exists[0]))
+             pred.engine_version, used, exists[0]))
         db.commit()
         return True
     db.execute(
         """INSERT INTO prediction_log
            (stock_code, trade_date, direction, confidence,
-            predicted_price, engine_version)
-           VALUES (?,?,?,?,?,?)""",
+            predicted_price, engine_version, pattern_type)
+           VALUES (?,?,?,?,?,?,?)""",
         (pred.stock_code, pred.trade_date, pred.direction,
-         pred.confidence, pred.predicted_price, pred.engine_version))
+         pred.confidence, pred.predicted_price, pred.engine_version, used))
     db.commit()
     return True
+
+
+def oos_stats(db: sqlite3.Connection) -> dict:
+    """已结算预测的样本外统计，对比多数类基线（不是 33%）。"""
+    rows = db.execute(
+        """SELECT direction, actual_direction, correct
+           FROM prediction_log WHERE actual_price IS NOT NULL"""
+    ).fetchall()
+    n = len(rows)
+    if n == 0:
+        return {"n": 0, "hits": 0, "accuracy": None,
+                "majority_class": None, "majority_baseline": None,
+                "vs_baseline": None}
+    hits = sum(int(r[2] or 0) for r in rows)
+    from collections import Counter
+    actuals = Counter(r[1] for r in rows)
+    maj_cls, maj_n = actuals.most_common(1)[0]
+    baseline = maj_n / n
+    acc = hits / n
+    return {
+        "n": n,
+        "hits": hits,
+        "accuracy": round(acc, 4),
+        "majority_class": maj_cls,
+        "majority_baseline": round(baseline, 4),
+        "vs_baseline": round(acc - baseline, 4),
+        "by_actual": dict(actuals),
+        "by_pred": dict(Counter(r[0] for r in rows)),
+    }
 
 
 def run_prediction_loop(db: sqlite3.Connection,

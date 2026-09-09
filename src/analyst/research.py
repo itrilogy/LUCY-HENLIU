@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv(str(Path(__file__).parent.parent / "config" / ".env"))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.datasource.gs_client import _get
+from src.datasource.gs_client import query_macro
 
 
 # ── 行业分类与查询模板 ─────────────────────────
@@ -332,8 +332,7 @@ def format_response(raw_response: str, query: str, db: Optional[sqlite3.Connecti
 def execute_query(query: str) -> str:
     """执行单条宏观查询"""
     try:
-        r = _get("https://dgzt.guosen.com.cn/skills/agent/adapter/query",
-                 {"text": query, "softName": "agent_skills"})
+        r = query_macro(query)
         return json.dumps(r, ensure_ascii=False)
     except Exception as e:
         return f"查询失败: {e}"
