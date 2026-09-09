@@ -1,15 +1,18 @@
 <div align="center">
-  <img src="src/assets/brand/favicon.svg" width="96" height="96" alt="衡流 · HengLiu" />
+  <img src="src/assets/brand/favicon.svg" width="64" height="64" alt="衡流 · HengLiu 产品标" />
+  &nbsp;&nbsp;
+  <img src="src/assets/brand/luxi-lab-main.svg" width="64" height="64" alt="鹿溪联合创新实验室 LUXI LAB" />
 </div>
 
 <h1 align="center">衡流 · HengLiu（QuantFlow）</h1>
 
 <p align="center">
-  <strong>本地量化分析工具</strong><br/>
-  <em>审度称衡，守正观流</em>
+  <strong>审度称衡，守正观流</strong><br/>
+  <em>Measuring probabilities, respecting the market current.</em>
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Matrix-理数%C2%B7三思-0D5E42" alt="matrix" />
   <img src="https://img.shields.io/badge/Product-衡流%20HengLiu-0D5E42" alt="product" />
   <img src="https://img.shields.io/badge/Lab-鹿溪联合创新实验室-047538" alt="lab" />
   <img src="https://img.shields.io/badge/Based%20on-国投证券%20%7C%20国信证券-6366f1" alt="datasource" />
@@ -18,7 +21,7 @@
 </p>
 
 <p align="center">
-  <b>鹿溪联合创新实验室（LUXI Joint Innovation Lab）</b> 出品<br/>
+  <b>鹿溪联合创新实验室</b>（LUXI Joint Innovation Lab）出品<br/>
   仓库：<a href="https://github.com/itrilogy/LUCY-HENLIU">itrilogy/LUCY-HENLIU</a>
 </p>
 
@@ -27,7 +30,7 @@
 基于国投证券(行情) + 国信证券(财务)双数据源的本地量化分析平台。
 每只股票独立的模式发现引擎，通过预测→反馈→迭代收敛实现自适应学习。
 
-## 数据全景
+## 📊 数据全景
 
 | 数据类型 | 覆盖范围 | 数据源 |
 |:---------|:---------|:-------|
@@ -37,7 +40,7 @@
 | 📋 财务报表 | 23只×20期(5年) | 国信证券 |
 | 🧠 模式库 | 277条可重复模式 | 自发现 |
 
-## 快速启动
+## 🚀 快速启动
 
 > 运行环境：直接使用系统 Python 3（本机已验证 Python 3.14 + sklearn 1.9 / pandas 3.0），**不创建 venv**。
 
@@ -65,7 +68,7 @@ streamlit run src/main.py
 > 所有 sync 脚本和 UI 入口都会自动执行 `src/db/schema.py` 的 `init_db()`，
 > 数据库表结构统一由 `src/db/schema.py` 管理。
 
-## 功能模块
+## 🧩 功能模块
 
 | 标签 | 功能 | 算法 |
 |:-----|:-----|:-----|
@@ -75,7 +78,7 @@ streamlit run src/main.py
 | 💹 财务趋势 | 营收/净利润/ROE趋势 | 国信API |
 | 🏷️ 操作 | 持仓切换 + 数据状态 | — |
 
-## 架构
+## 🏗 架构
 
 ```
 src/
@@ -95,7 +98,7 @@ src/
 tests/                         # pytest（connection/日历/同步门面/泄漏/OOS）
 ```
 
-## 工程能力
+## ⚙️ 工程能力
 
 | 能力 | 说明 |
 |---|---|
@@ -110,7 +113,7 @@ tests/                         # pytest（connection/日历/同步门面/泄漏/
 | 回测绩效 | 成本模型（默认双边 0.1%）、最大回撤、夏普、分模式胜率 |
 | 模式显著性 | 二项检验（α=0.05，样本≥10），不显著模式投票权重减半 |
 
-## 收敛预测闭环
+## 🔁 收敛预测闭环
 
 每只股票独立的 PatternDiscoveryEngine 通过历史K线发现可重复模式。
 `src/sync_daily.py` 每次同步后自动执行 `src/quant/prediction_loop.py`：
@@ -123,11 +126,30 @@ tests/                         # pytest（connection/日历/同步门面/泄漏/
 - **新预测**：基于最新状态生成下一交易日预测入库；模式方向为先验规则，不再用次日标签冒充命中率
 - **口径**：不要把三分类均匀 33% 当成能力。诚实零假设是多数类（A 股常为盘整）。UI「因子&信号」展示 `prediction_log` 命中率相对多数类基线。首轮实盘结算约 5/24（弱于随机），需积累后再评估
 
-## 说明
+## 💡 说明
 
 - SSL：所有 HTTPS 请求保持证书验证；国信服务器仅支持 legacy renegotiation，
   已通过 `OP_LEGACY_SERVER_CONNECT` 显式兼容（而非关闭验证）。
 - 敏感配置 `config/.env` 已被 `.gitignore` 排除，请勿提交真实 Key。
+
+---
+
+## 🎨 品牌标识
+
+| 标识 | 预览 | 说明 | 源文件 |
+| :---: | :---: | :--- | :--- |
+| **产品方标** | <img src="src/assets/brand/favicon.svg" width="32" height="32" alt="衡流" /> | 马尔可夫环 + K线波段 + 溪流 + 源启星 | `src/assets/brand/favicon.svg` |
+| **产品字锁** | [`src/assets/brand/logo.svg`](src/assets/brand/logo.svg) | 横版产品字锁 | `src/assets/brand/logo.svg` |
+| **实验室主标** | <img src="src/assets/brand/luxi-lab-main.svg" width="32" height="32" alt="LUXI LAB" /> | 官方 LUXI LAB | `src/assets/brand/luxi-lab-main.svg` |
+
+**色板（LUXI CI）**
+
+| Token | 色值 | 用途 |
+| :--- | :--- | :--- |
+| 鹿溪绿 | `#0D5E42` | 主色 / 图标底板 |
+| 源启白 | `#F5F7FA` | 浅色背景 / 反白 |
+| 进化蓝 | `#00D2FF` | 溪流 / 数据高亮 |
+| 标题金 | `#F1C40F` | 落点 / 显著信号 |
 
 ---
 
@@ -152,3 +174,12 @@ Streamlit · Plotly · pandas · numpy · scikit-learn · scipy · httpx · pyth
 **API Key 使用规范**：
 - `config/.env` 中的 Key 属个人凭证，请勿提交到公共仓库
 - 国信接口有每日调用限额（超出后当日熔断，次日重置），请合理规划同步频率
+
+---
+
+<div align="center">
+  <img src="src/assets/brand/luxi-lab-main.svg" width="48" height="48" alt="LUXI LAB" />
+  <p><strong>衡流 · HengLiu</strong> · 审度称衡，守正观流</p>
+  <p>© 鹿溪联合创新实验室 · LUXI Joint Innovation Lab</p>
+  <p><em>林深见鹿，源启清溪 · Deep Insights, Evolutionary Origin.</em></p>
+</div>
